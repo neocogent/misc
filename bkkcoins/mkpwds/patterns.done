@@ -1,0 +1,105 @@
+%s+%s=%s%s@L3AsT
+%s+%s=%s%s(at least)
+%s+%s=%s%s(atleast)
+%s+%s=%s%s(@L3AsT)
+%s+%s=%s%s(@L3asT)
+%s+%s=%s%s(@Least)
+%s+%s=%s%s(@LeasT)
+%s+%s=%s%s(atL3AsT)
+%s+%s=%s%s(at L3AsT)
+%s+%s>%s%s
+%s+%s>=%s%s
+%s+%s=%s%s(ATLEAST)
+%s+%s=%s%s(AT LEAST)
+%s+%s=%s%s(@LEAST)
+%s+%s=%s%s(@ LEAST)
+%s+%s=%s%sATLEAST
+%s+%s=%s%sAT LEAST
+%s+%s=%s%satleast
+%s+%s=%s%sat least
+%s+%s=%s%s(@L3AST)
+%s+%s=%s%s(@ L3AST)
+%s+%s=%s%s(At least)
+%s+%s=%s%s(at Least)
+%s+%s=%s%s(At Least)
+%s+%s=%s%s(At LEAST)
+%s+%s=%s%s(AT Least)
+%s+%s=%s%s(AT LEast)
+%s+%s=%s%s(At LEast)
+%s+%s=%s%s(At LEAst)
+%s+%s=%s%s(At LEASt)
+%s+%s=%s%s(At L3ast)
+%s+%s=%s%s(At L3AsT)
+%s+%s=%s%s(at L3ast)
+%s+%s=%s%s(at least)
+%s+%s=%s%s(at LEAST)
+%s+%s<%s%s
+%s+%s<=%s%s
+%s+%s>%s%s(@Least)
+%s+%s>%s%s(@LeasT)
+%s+%s>%s%s(atL3AsT)
+%s+%s>%s%s(at L3AsT)
+s+%s>%s%s(ATLEAST)
+%s+%s>%s%s(AT LEAST)
+%s+%s>%s%s(@LEAST)
+%s+%s>%s%s(@ LEAST)
+%s+%s>%s%sATLEAST
+%s+%s>%s%sAT LEAST
+%s+%s>%s%satleast
+%s+%s>%s%sat least
+%s+%s>%s%s(@L3AST)
+%s+%s>%s%s(@ L3AST)
+%s+%s>%s%s(At least)
+%s+%s>%s%s(at Least)
+%s+%s>%s%s(At Least)
+%s+%s>%s%s(At LEAST)
+%s+%s>%s%s(AT Least)
+%s+%s>%s%s(AT LEast)
+%s+%s>%s%s(At LEast)
+%s+%s>%s%s(At LEAst)
+%s+%s>%s%s(At LEASt)
+%s+%s>%s%s(At L3ast)
+%s+%s>%s%s(At L3AsT)
+%s+%s>%s%s(at L3ast)
+%s+%s>%s%s(at least)
+%s+%s>%s%s(at LEAST)
+%s+%s>=%s%s(@Least)
+%s+%s>=%s%s(@LeasT)
+%s+%s>=%s%s(atL3AsT)
+%s+%s>=%s%s(at L3AsT)
+s+%s>=%s%s(ATLEAST)
+%s+%s>=%s%s(AT LEAST)
+%s+%s>=%s%s(@LEAST)
+%s+%s>=%s%s(@ LEAST)
+%s+%s>=%s%sATLEAST
+%s+%s>=%s%sAT LEAST
+%s+%s>=%s%satleast
+%s+%s>=%s%sat least
+%s+%s>=%s%s(@L3AST)
+%s+%s>=%s%s(@ L3AST)
+%s+%s>=%s%s(At least)
+%s+%s>=%s%s(at Least)
+%s+%s>=%s%s(At Least)
+%s+%s>=%s%s(At LEAST)
+%s+%s>=%s%s(AT Least)
+%s+%s>=%s%s(AT LEast)
+%s+%s>=%s%s(At LEast)
+%s+%s>=%s%s(At LEAst)
+%s+%s>=%s%s(At LEASt)
+%s+%s>=%s%s(At L3ast)
+%s+%s>=%s%s(At L3AsT)
+%s+%s>=%s%s(at L3ast)
+%s+%s>=%s%s(at least)
+%s+%s>=%s%s(at LEAST)
+1%s+1%s!=%s%s@L3AsT
+1%s+1%s<>%s%s@L3AsT
+1%s+1%s>=%s%s@L3AsT
+1%s+1%s<=%s%s@L3AsT
+1%s+1%s!=%s%s(at least)
+1%s+1%s<>%s%s(at least)
+1%s+1%s>=%s%s(at least)
+1%s+1%s<=%s%s(at least)
+1%s+1%s!=%s%s(atleast)
+1%s+1%s<>%s%s(atleast)
+1%s+1%s>=%s%s(atleast)
+1%s+1%s<=%s%s(atleast)

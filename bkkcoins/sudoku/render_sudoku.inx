@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<inkscape-extension xmlns="http://www.inkscape.org/namespace/inkscape/extension">
+  <_name>Sudoku</_name>
+  <id>org.inkscape.render.sudoku</id>
+
+  <dependency type="executable" location="extensions">render_sudoku.py</dependency>
+  <dependency type="executable" location="extensions">inkex.py</dependency>
+
+  <param name="tab" type="notebook">
+    <page name="tab" _gui-text="Puzzle">
+      <param name="difficulty" type="enum" _gui-text="Difficulty">
+        <_item value="mixed">Mixed</_item>
+        <_item value="simple">Simple</_item>
+        <_item value="easy">Easy</_item>
+        <_item value="intermediate">Intermediate</_item>
+        <_item value="expert">Expert</_item>
+      </param>
+    </page>    
+    <page name="tab" _gui-text="Layout">
+      <param name="rows" type="int" min="1" max="6" _gui-text="Rows">1</param>
+      <param name="cols" type="int" min="1" max="6" _gui-text="Cols">1</param>
+      <param name="puzzle-size" type="string" _gui-text="Puzzle Size">6cm</param>
+      <param name="puzzle-gap" type="string" _gui-text="Between Puzzle Gap">1cm</param>
+    </page>
+    <page name="tab" _gui-text="Colors">
+      <param name="color-text" type="string" _gui-text="Text color ">#000000</param>
+      <param name="color-bkgnd" type="string" _gui-text="Background color">#FFFFFF</param>
+      <param name="color-puzzle" type="string" _gui-text="Puzzle Border color">#000000</param>
+      <param name="color-boxes" type="string" _gui-text="Box Border color ">#000000</param>
+      <param name="color-cells" type="string" _gui-text="Cell Border color">#909090</param>
+    </page>
+  </param>
+  <effect>
+    <object-type>all</object-type>
+    <effects-menu>
+      <submenu _name="Render"/>
+    </effects-menu>
+  </effect>
+  <script>
+    <command reldir="extensions" interpreter="python">render_sudoku.py</command>
+  </script>
+</inkscape-extension>

@@ -1,0 +1,104 @@
+#!/usr/bin/env python
+#
+# Read seeds from stdin and output MPK (Master Public Key), and key/address pairs.
+# Input one seed per line hex (32 chars).
+#
+# Outputs the SEED and MPK for restoring to Electrum.
+# SEED for full wallet, MPK for watch only wallet.
+# eg.
+#     hexdump -v -e '/1 "%02X"' -n 16 /dev/urandom | genkeys
+# or
+#     echo "1279666de665e6c662d2f45538842acd" | genkeys
+#
+# Optionally given an index and count it also will 
+# generate key/address pairs. Arguments are,
+# 
+#    genkeys [count] [chg] [start-index]
+#
+# Where:
+#    count is number of key/addr pairs to output, default none
+#    chg is number of change key/addr pairs to append
+#    start-index, defaults to 0 
+#
+
+
+import sys, ecdsa, hashlib
+  
+# support functions - formatting and conversion 
+
+def b58encode(addr):
+    alphabet = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz'
+    long_value = 0L
+    for (i, c) in enumerate(addr[::-1]):
+        long_value += (256**i) * ord(c)
+
+    result = ''
+    while long_value >= 58:
+        div, mod = divmod(long_value, 58)
+        result = alphabet[mod] + result
+        long_value = div
+    result = alphabet[long_value] + result
+
+    nPad = 0
+    for c in addr:
+        if c == '\0': nPad += 1
+        else: break
+
+    return (alphabet[0]*nPad) + result
+
+def public_key_to_address(public_key):
+    vh160 = chr(0) + ripemd160( sha256( public_key.decode('hex') ))
+    hash = sha256(sha256( vh160 ))
+    return b58encode( vh160 + hash[0:4] )
+         
+def private_key_to_wif(priv_key):
+    hash = sha256(sha256( priv_key ))
+    return b58encode( priv_key + hash[0:4] )
+    
+def seq(i, chg, mpk):
+    return int( sha256(sha256( "%d:%d:" % (i, chg) + mpk )).encode('hex'), 16 )
+    
+def sha256(msg):
+	return hashlib.sha256(msg).digest()
+	
+def ripemd160(msg):
+    md = hashlib.new('ripemd160')
+    md.update( msg )
+    return md.digest()
+        
+# secp256k1, http://www.oid-info.com/get/1.3.132.0.10
+_p = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2FL
+_r = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141L
+_b = 0x0000000000000000000000000000000000000000000000000000000000000007L
+_a = 0x0000000000000000000000000000000000000000000000000000000000000000L
+_Gx = 0x79BE667EF9DCBBAC55A06295CE870B07029BFCDB2DCE28D959F2815B16F81798L
+_Gy = 0x483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8L
+curve_secp256k1 = ecdsa.ellipticcurve.CurveFp( _p, _a, _b )
+generator_secp256k1 = ecdsa.ellipticcurve.Point( curve_secp256k1, _Gx, _Gy, _r )
+oid_secp256k1 = (1,3,132,0,10)
+SECP256k1 = ecdsa.curves.Curve("SECP256k1", curve_secp256k1, generator_secp256k1, oid_secp256k1 ) 
+
+# read seeds, do math, output mpk and key pairs
+for seed in sys.stdin:
+    secexp = seed = seed[:32].replace(' ', '')
+    for i in range(100000):
+        secexp = sha256(secexp + seed)
+    secexp = int(secexp.encode('hex'), 16)
+    master_private_key = ecdsa.SigningKey.from_secret_exponent( secexp, curve = SECP256k1 )
+    master_public_key = master_private_key.get_verifying_key().to_string()
+    print "\nSeed:%s\nMPK:%s\n" % (seed, master_public_key.encode('hex'))
+    
+    argc = len(sys.argv)
+    if argc > 1:
+        count = 5 if argc < 2 else int(sys.argv[1])
+        chg = 0 if argc < 3 else int(sys.argv[2])
+        index = 0 if argc < 4 else int(sys.argv[3])
+
+        for (i,c) in [(n,0) for n in range(index,index+count)]+[(n,1) for n in range(index,index+chg)]:
+            priv_key = ( '%064x' % ((secexp + seq(i, c, master_public_key)) % _r) ).decode('hex')
+            pubkey = master_private_key.get_verifying_key().pubkey.point + seq(i, c, master_public_key) * generator_secp256k1
+            pub_key_str = '04' + ecdsa.VerifyingKey.from_public_point( pubkey, curve = SECP256k1 ).to_string().encode('hex')
+            print "m/%d/%d %s,%s" % (c,i, private_key_to_wif( chr((0+128)&255) + priv_key ), public_key_to_address( pub_key_str ))
+
+         
+        

@@ -1,0 +1,32 @@
+cfmstats runs as a daemon that monitors Bitcoin transactions via bitcoind rpc and builds a statistical array of confirmation speed broken down by transaction amount and fees. 
+
+It can take an HTML template and insert the data for presentation on a web interface. It also dumps the data in a simple CSV file for other uses. The ranges or "buckets" that transactions are sorted into can be set by start up options. The resulting output values are "average block count to confirm" for each amount/fee combination. The program maintains a state in the .cfg and .dat files.
+
+See the usage info (cfmstats -h) for available options. By default cfmstats runs as daemon in the background. Use --debug to run in foreground mode with logging to sdtout.
+
+The first time you run cfmstats you will want to provide the rpc url with -r to connect to bitcoind. 
+
+File Info:
+
+cfmstats runs with the working directory set to /home/$user/cfmstats 
+
+cfmstats.cfg - config values, saved by -s option and overridden by cmd line.
+cfmstats.dat - statistical data so that shutting down won't lose history.
+cfmstats.log - activity log (only in daemon mode)
+
+cfmstats_avg.csv - CSV output results, Average Confirmation Time.
+cfmstats_1st.csv - CSV output results, Probable Next Block.
+
+cfmstats.html - HTML output result built from the template below.
+cfmstats.tmp.html - HTML template. Modify to suit your needs.
+    Supports 4 insertion variables:
+        %avg% - where to insert the "Average Confirmation Time" table.
+        %1st% - where to insert the "Probable Next Block" table.
+        %blockcount% - where to insert the latest blockcount.
+        %trxcount% - where to insert the total number of transactions counted.
+    
+How It Works:
+
+cfmstats polls bitcoind asking for "mempool" transactions and new blocks. Mempool transactions are processed to sum inputs and outputs to calculate value and fees. These are cached until each transaction is confirmed. At start up the transactions present in the mempool are marked as old so that they are not used in statistics. This is because we don't really know when they were sent. 
+
+When a new block arrives each transaction is looked up in the cache to determine how many blocks have passed since it was sent. The transaction value and fees are used to select which table cell is updated with block count difference and transaction count. After each block is processed the stats data is updated to the HTML and CSV files.

@@ -1,0 +1,47 @@
+#!/bin/bash
+# converts one-line sudoku puzzles to SVG graphic 
+# defaults to stdout but if given a filename then numbers 
+# multiple svg files from 0 upwards one for each puzzle line input
+# created by Chris Savery 2011
+# this bash script is hereby released into the public domain
+
+if [ -z $1 ]; then
+  echo "Usage: $(basename $0) template.svg [dest-svg] [pdf]"
+  exit
+fi
+
+pc=0
+fc=0
+puzzles=( $( </dev/stdin ) )
+
+while [ -n "${puzzles[$pc]}" ]; do
+  if [ -n "$2" ]; then
+    rm ${2%.*}$fc".svg" >/dev/null 2>&1
+    exec 1<>${2%.*}$fc".svg"
+  fi
+  while read svg; do
+    if [[ $svg == *puzzle-text* ]]; then
+      vars=($svg)
+      size=$((${vars[2]} / 9))
+      yoff=$((($size + ${vars[3]}) / 2 ))
+      if [ -n "${puzzles[$pc]}" ]; then
+        for((n=0; n<81; n++)); do
+          line=${puzzles[$pc]}
+          if [[ ${line:$n:1} =~ [1-9] ]]; then
+            echo "<tspan x=\"$(($n % 9 * $size+$size/2))\" y=\"$(($n / 9 * $size + $yoff))\">${line:$n:1}</tspan>"
+          fi
+        done
+        pc=$(($pc+1))
+      fi
+    else
+     echo $svg
+    fi
+  done<$(dirname $0)"/"$1
+  if [ -n "$2" ]; then
+  exec 1>&-
+  fi
+  if [ "$3" == "pdf" ]; then
+    inkscape -A ${2%.*}$fc".pdf" ${2%.*}$fc".svg"
+  fi  
+  fc=$(($fc+1))
+done

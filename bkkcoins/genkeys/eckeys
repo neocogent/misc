@@ -1,0 +1,175 @@
+#!/usr/bin/env python
+#
+# This version with EC math built in requires only std modules.
+#
+# Read seeds from stdin and output MPK (Master Public Key), and key/address pairs.
+# Input one seed per line hex (32 chars).
+#
+# Outputs the SEED and MPK for restoring to Electrum.
+# SEED for full wallet, MPK for watch only wallet.
+# eg.
+#     hexdump -v -e '/1 "%02X"' -n 16 /dev/urandom | genkeys
+# or
+#     echo "1279666de665e6c662d2f45538842acd" | genkeys
+#
+# Optionally given an index and count it also will 
+# generate key/address pairs. Arguments are,
+# 
+#    rawkeys [count] [chg] [start-index]
+#
+# Where:
+#    count is number of key/addr pairs to output, default none
+#    chg is number of change key/addr pairs to append
+#    start-index, defaults to 0 
+#
+
+import sys, hashlib
+
+# the secp256k1 curve parameters 
+_p = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2FL
+_r = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141L
+_b = 0x0000000000000000000000000000000000000000000000000000000000000007L
+_a = 0x0000000000000000000000000000000000000000000000000000000000000000L
+_Gx = 0x79BE667EF9DCBBAC55A06295CE870B07029BFCDB2DCE28D959F2815B16F81798L
+_Gy = 0x483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8L
+
+# EC math support (adapted from python-ecdsa)
+# these 4 functions give us point multiply needed for public keys
+
+def InvMod(a, m):
+    if a < 0 or m <= a: a = a % m
+    
+    c, d = a, m
+    uc, vc, ud, vd = 1, 0, 0, 1
+    while c != 0:
+        q, c, d = divmod( d, c ) + ( c, )
+        uc, vc, ud, vd = ud - q*uc, vd - q*vc, uc, vc
+        
+    assert d == 1
+    if ud > 0: return ud
+    else: return ud + m
+    
+def ptDouble( pt ):
+    (x,y) = pt
+    if (x,y) == (None,None): 
+        return (None, None)
+        
+    l = ( ( 3 * x * x + _a ) * InvMod( 2 * y, _p ) ) % _p
+    x3 = ( l * l - 2 * x ) % _p
+    y3 = ( l * ( x - x3 ) - y ) % _p
+    
+    return (x3,y3)
+ 
+def ptAdd( pt1, pt2 ):
+    (x1,y1) = pt1; (x2,y2) = pt2
+    
+    if (x2,y2) == (None, None): return (x1,y1)
+    if (x1,y1) == (None, None): return (x2,y2)
+
+    if x1 == x2:
+        if ( y1 + y2 ) % _p == 0:
+            return (None, None)
+        else:
+            return ptDouble((x1,y1))
+
+    l = ( ( y2 - y1 ) * InvMod( x2 - x1, _p ) ) % _p
+
+    x3 = ( l * l - x1 - x2 ) % _p
+    y3 = ( l * ( x1 - x3 ) - y1 ) % _p
+
+    return (x3, y3)
+   
+def ptMul( pt, z ):
+    (x,y) = pt
+    
+    def leftmost_bit( x ):
+        assert x > 0
+        result = 1
+        while result <= x: result = 2 * result
+        return result // 2
+
+    e = z % _r
+    if e == 0: return (None, None)
+    if (x,y) == (None, None): return (None, None)
+    assert e > 0
+
+    e3 = 3 * e
+    i = leftmost_bit( e3 ) // 2
+    (xr,yr) = (x,y)
+
+    while i > 1:
+      (xr,yr) = ptDouble((xr,yr))
+      if ( e3 & i ) != 0 and ( e & i ) == 0:
+          (xr,yr) = ptAdd((xr,yr), (x,y))
+      if ( e3 & i ) == 0 and ( e & i ) != 0: 
+          (xr,yr) = ptAdd((xr,yr), (x,-y))
+      i = i // 2
+
+    return (xr,yr)
+
+# support functions - formatting and conversion 
+
+def b58encode(addr):
+    alphabet = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz'
+    long_value = 0L
+    for (i, c) in enumerate(addr[::-1]):
+        long_value += (256**i) * ord(c)
+
+    result = ''
+    while long_value >= 58:
+        div, mod = divmod(long_value, 58)
+        result = alphabet[mod] + result
+        long_value = div
+    result = alphabet[long_value] + result
+
+    nPad = 0
+    for c in addr:
+        if c == '\0': nPad += 1
+        else: break
+
+    return (alphabet[0]*nPad) + result
+
+def public_key_to_address(public_key):
+    vh160 = chr(0) + ripemd160( sha256( public_key.decode('hex') ))
+    hash = sha256(sha256( vh160 ))
+    return b58encode( vh160 + hash[0:4] )
+         
+def private_key_to_wif(priv_key):
+    hash = sha256(sha256( priv_key ))
+    return b58encode( priv_key + hash[0:4] )
+    
+def seq(i, chg, mpk):
+    return int( sha256(sha256( "%d:%d:" % (i, chg) + mpk )).encode('hex'), 16 )
+    
+def sha256(msg):
+    return hashlib.sha256(msg).digest()
+    
+def ripemd160(msg):
+    md = hashlib.new('ripemd160')
+    md.update( msg )
+    return md.digest()
+
+# read seeds, do math, output mpk and key pairs
+for seed in sys.stdin:
+    secexp = seed = seed[:32].replace(' ', '')
+    for i in range(100000):
+        secexp = sha256( secexp + seed )
+    secexp = int(secexp.encode('hex'), 16)
+    mpk = (x,y) = ptMul((_Gx,_Gy), secexp)
+    mpk_str = ('%064x' % x + '%064x' % y).decode('hex')
+    print "\nSeed:%s\nMPK:%s\n" % (seed, mpk_str.encode('hex'))
+    
+    argc = len(sys.argv)
+    if argc > 1:
+        count = 5 if argc < 2 else int(sys.argv[1])
+        chg = 0 if argc < 3 else int(sys.argv[2])
+        index = 0 if argc < 4 else int(sys.argv[3])
+
+        for (i,c) in [(n,0) for n in range(index,index+count)]+[(n,1) for n in range(index,index+chg)]:
+            priv_key = ('%064x' %  ((secexp + seq(i, c, mpk_str)) % _r) ).decode('hex')
+            (x,y) = ptAdd(mpk, ptMul((_Gx,_Gy), seq(i, c, mpk_str)))
+            pub_key_str = '04' + ('%064x' % x) + ('%064x' % y)
+            print "m/%d/%d %s,%s" % (c,i, private_key_to_wif( chr((0+128)&255) + priv_key ), public_key_to_address( pub_key_str ))
+
+        
+        

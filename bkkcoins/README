@@ -1,0 +1,28 @@
+This repository is a collection of misc small code projects. Some I created and some I found or modified from elsewhere. Either way it's not really worth having a repository for each one.
+
+I collected them all here so I don't lose them, and so others can find and use them easily. I'll be adding more junk here as time passes. If you like weird odds and sodds then check back.
+
+Bitcoin:
+chainkeys - Web page for combining multi-key chains.
+coinwatch - Simple payments daemon updates mysql tables (bitcoind/blockchain.info).
+epmtd	  - Simple payments daemon using only mysql table (Electrum MPK based).
+keyfmt	  - Convert private key as Hex, WIF, Pubkey, Address cmd line tool.
+hexwif 	  - Convert Bitcoin hex private key to WIF format cmd line tool.
+mkpwds	  - Password list generator for gpg private key challenge. 
+mickey	  - Simple cmd line Bitcoin key generator based on keyconv.
+mpk  	  - Output Electrum Master Public Key (MPK) given a seed.
+mpkgen	  - C/Python/PHP scripts, PHP extension to generate addresses from MPK.
+cfmstats  - Generate statistics on Bitcoin confirmation speed by value and fee.
+gox       - Minimal script to call MtGox API for ticker and lag data.
+mkseeds   - Create Electrum seeds from hex input or generate with addresses.
+
+genkeys   - Generate MPK, key/address pairs from an Electrum seed (offline use).
+jskeys    - same as above, output as JSON object 
+eckeys    - as above, no ecdsa import - EC math explicit using builtins
+
+Other:
+sudoku	  - Inkscape extension (and bash script) to create SVG/PDF sudoku puzzles. 
+gps       - Caluclate distance between two GPS co-ords.
+b2b       - Convert between bases using in/out alphabets.
+
+

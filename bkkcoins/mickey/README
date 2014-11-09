@@ -1,0 +1,37 @@
+This code was hacked from the vanitygen keyconv utility.
+
+(https://github.com/samr7/vanitygen)
+
+The idea was to have the simplest key generator for fast code review before offline use.
+
+You can compile and run this program without having to use anything but signed packages from the linux repos.
+
+Prep:
+
+sudo apt-get install build-essential libssl-dev
+
+Compile:
+
+gcc -o mickey mickey.c -lcrypto
+
+Run:
+
+./mickey 3
+Address: 18uiqewQRU5KNb6ksPsm9itm7ox918bLCn
+Privkey: 5K6GN9Rs7XWQPk351Cb8KN3rjW524iTzt1iiAxgJWpqruGmShB9
+
+Address: 16fzTFM3CspVyzgHg1jTYF8MkVC8rX5vEQ
+Privkey: 5HzvE29u9X1t3bXHRyX3SN5TEFJB3ezAq9xznV2oKDGc5wrM4NB
+
+Address: 1HsFVnD5aejdU1PMSFg3utBRxu6CZtP8Pm
+Privkey: 5JJdNRv7sRmmTdzJdz8UdHYmHBGUXiRrksMSGxjbhDPbGu6Anin
+
+More:
+
+On linux you can also directly send the output to your printer,
+
+mickey 3 | lpr
+
+And, just for fun, if you have the qrencode pkg installed (sudo apt-get install qrencode) then this gives you a QR code of a private key,
+
+mickey |grep Privkey |cut -d\  -f2 |qrencode -o key.png

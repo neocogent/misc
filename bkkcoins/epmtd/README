@@ -1,0 +1,30 @@
+
+epmtd is an Electrum-based Bitcoin payment daemon.
+
+Note - it has not been tested much at this time.
+
+It uses a single mysql table to maintain a wallet address pool and updates wallet balances via an electrum server. This enables bitcoin payments with minimal resources and changes on the web server. If a fully trusted verification process is required then it can work with a local or external electrum-server install on top of bitcoind.
+
+Only one mysql table is required, as defined below. The balance column reflects the current unspent outputs on an address. Application logic can then be based on this balance and updating user account information, which could be different depending on how funds are managed.
+
+CREATE TABLE `wallet` ( /* tracks bitcoin addresses and maintains a ready to use address pool */
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `address` int(11) DEFAULT NULL, 	/* the address */
+  `balance` decimal(13,0) DEFAULT NULL,	/* current address balance */
+  `swept` decimal(13,0) DEFAULT NULL,	/* any address amount swept */
+  `status` char(1) DEFAULT NULL,	/* address state */
+  PRIMARY KEY (`id`)
+)
+
+Column 'status' can be: P = Pool (ready for use), A = Assigned (to user/invoice), S = Subscribed (monitoring), E = Expired. 
+
+The number of pool addresses is monitored and more are created from the Master Public Key (MPK) when below the minumum. New addresses start out as 'P', and once the address has been assigned to a user or invoice it should be changed to 'A' by the application. Assigned addresses are monitored and converted to Subscribed addresses once they have been subscribed in the electrum wallet.
+
+If multiple application instances can assign addresses to users/invoices then some locking mechanism should be employed. A simple one would be to use a temporary instance-unique status value.
+eg.
+update wallet set status='1' where status='P' order by id limit 1; /* prevents other instance using address */
+update user set address=(select address from wallet where status='1' limit 1') where user=some-condition;  /* assigns to user */
+update wallet set status='A' where status='1' limit 1; /* marks it as assigned, enabling epmtd to subscribe */
+
+If user balances are not touched externally then the single wallet balance reflects the actual user balance. If an offline wallet performs address sweeps (pooling received funds) then the swept column should be updated. Actual user balance would then be (balance+swept).
+

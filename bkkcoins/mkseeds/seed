@@ -1,0 +1,11 @@
+#!/usr/bin/env python
+#
+# Generate Electrum seed
+#
+# Usage: seed
+
+import ecdsa, mnemonic
+
+random_seed = lambda n: "%032x"%ecdsa.util.randrange( pow(2,n) )
+
+print ' '.join(mnemonic.mn_encode(random_seed(128)))

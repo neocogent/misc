@@ -1,0 +1,26 @@
+#!/usr/bin/env python
+#
+# Generate Electrum seeds
+#
+# Usage: mkseeds [seedcount] [address count]
+
+import sys, ecdsa, mnemonic, account, bitcoin
+
+random_seed = lambda n: "%032x"%ecdsa.util.randrange( pow(2,n) )
+
+if __name__ == '__main__':
+    
+    seedcount = 1 if len( sys.argv ) == 1 else int(sys.argv[1])
+    for s in range(seedcount):    
+        seed = random_seed(128)
+        print ' '.join(mnemonic.mn_encode(seed))
+
+        master_k, master_c, master_K, master_cK = bitcoin.bip32_init(seed)
+        k0, c0, K0, cK0 = bitcoin.bip32_private_derivation(master_k, master_c, "m/", "m/0'/")
+        c0, K0, cK0 = bitcoin.bip32_public_derivation(c0.decode('hex'), K0.decode('hex'), "m/0'/", "m/0'/0")
+        
+        acct = account.BIP32_Account({ 'c':c0, 'K':K0, 'cK':cK0 })
+        addrcount = 5 if len( sys.argv ) < 3 else int(sys.argv[2])
+        for i in range(addrcount):
+            acct.create_new_address(0)
+        print 

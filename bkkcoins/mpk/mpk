@@ -1,0 +1,32 @@
+#!/usr/bin/env python
+#
+# Read a seed from stdin and output MPK (Master Public Key).
+# Input one seed per line hex (32 chars).
+#
+# Outputs the SEED and MPK for restoring to Electrum.
+# SEED for full wallet, MPK for watch only wallet.
+# eg.
+#     hexdump -v -e '/1 "%02X"' -n 16 /dev/urandom | mpk
+# or
+#     echo "1279666de665e6c662d2f45538842acd" |mpk
+
+import sys, ecdsa, hashlib
+
+# secp256k1, http://www.oid-info.com/get/1.3.132.0.10
+_p = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2FL
+_r = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141L
+_b = 0x0000000000000000000000000000000000000000000000000000000000000007L
+_a = 0x0000000000000000000000000000000000000000000000000000000000000000L
+_Gx = 0x79BE667EF9DCBBAC55A06295CE870B07029BFCDB2DCE28D959F2815B16F81798L
+_Gy = 0x483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8L
+curve_secp256k1 = ecdsa.ellipticcurve.CurveFp( _p, _a, _b )
+generator_secp256k1 = ecdsa.ellipticcurve.Point( curve_secp256k1, _Gx, _Gy, _r )
+oid_secp256k1 = (1,3,132,0,10)
+SECP256k1 = ecdsa.curves.Curve("SECP256k1", curve_secp256k1, generator_secp256k1, oid_secp256k1 ) 
+
+for seed in sys.stdin:
+    oldseed = seed = seed[:32].replace(' ', '')
+    for i in range(100000):
+        seed = hashlib.sha256(seed + oldseed).digest()
+    master_private_key = ecdsa.SigningKey.from_secret_exponent( ecdsa.util.string_to_number( seed ), curve = SECP256k1 )
+    print "Seed:", oldseed, "\nMPK:", master_private_key.get_verifying_key().to_string().encode('hex')

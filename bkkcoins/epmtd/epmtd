@@ -1,0 +1,199 @@
+#!/usr/bin/env python
+#
+# Note - at this time this has not been tested much yet.
+#
+import os, sys, getopt, daemon, datetime, signal, pwd, getpass, pickle
+import MySQLdb as mdb
+from electrum import Wallet, Interface, WalletVerifier, SimpleConfig, WalletSynchronizer
+
+
+version = "0.1.0"
+cfg = { 'poll':60, 'log':sys.argv[0]+'.log', 'pid':sys.argv[0]+'.pid', 'confirm': [(2,1e7),(6,0)], 'gaplimit': 10 }
+
+def main():
+	print logts(), "Started pid:", os.getpid()
+	with file(cfg['pid'],'w') as f: f.write(str(os.getpid()))
+	
+	wallet_config = SimpleConfig()
+	master_public_key = cfg['mpk']
+	wallet_config.set_key('master_public_key', master_public_key)
+	wallet = Wallet(wallet_config)
+	wallet.synchronize = lambda: None # prevent address creation by the wallet
+
+	if cfg['server']:
+		interface = Interface({'server':"%s:%d:%c" % cfg['server']})
+		interface.start()
+		interface.send([('blockchain.numblocks.subscribe',[])])
+
+		wallet.interface = interface
+		interface.register_callback('updated', on_wallet_update)
+
+		verifier = WalletVerifier(interface, wallet_config)
+		wallet.set_verifier(verifier)
+
+		synchronizer = WalletSynchronizer(wallet, wallet_config)
+		synchronizer.start()
+		verifier.start()
+	else:
+		print "Warning: No electrum server specified. Only topping up address pool." 
+    
+	u,p,n,h = cfg['db'].split(':')
+	db = mdb.connect(h,u,p,n)
+	
+	if cfg['debug']:
+		run()
+	else:
+		with daemon.DaemonContext(working_directory='/home/%s/'%cfg['user'],stdout=open(cfg['log'],'a'),stderr=open(cfg['log'],'a'),
+				signal_map={signal.SIGTERM:sigterm}):
+			run()
+			
+def run():
+	cur = db.cursor()
+	cur.execute("select address from wallet where status='S';")
+	subscribed = cur.fetchall()
+	for addr in subscribed:
+		Subscribe(addr)
+		
+	while 1:
+		cur.execute("select id from wallet where status=NULL order by id desc;")
+		gap = cur.rowcount
+		last, = cur.fetchone()
+		while gap < cfg['gaplimit']:
+			last += 1
+			cur.execute("insert into wallet set address='%s';", wallet.get_new_address(last, 0))
+			gap += 1
+			
+		cur.execute("select address from wallet where status='A';")
+		accounts = cur.fetchall()
+		for addr in accounts:
+			if addr not in wallet.addresses:
+				print logts(), "subscribing to %s" % addr
+				Subscribe(addr)
+				cur.execute("update wallet set status='S' where address='%s';", addr)
+		sleep(cfg['poll'])	
+	cur.close()
+	
+	
+def on_wallet_update():
+	cur = db.cursor()	
+	cur.execute("select address,balance from wallet where status='S';")
+	subscribed = cur.fetchall()
+	for addr,balance in subscribed:
+		value = 0
+		history = wallet.history.get(addr)
+		for tx_hash,tx_height in history:
+			tx = wallet.transactions.get(tx_hash)
+			if not tx: continue
+			for output in tx.get('outputs'):
+				if output.get('address') == addr:
+					value += ChkConfirm(output.get('value'), verifier.get_confirmations(tx_hash))
+		if balance != value:
+			cur.execute("update wallet set balance=value where address='%s';", addr)
+			print logts(), "payment received, %s balance %f" % (addr,value/1.e8)
+		
+	cur.close()
+
+def ChkConfirm(value, confirms):
+	for n,(cfms,limit) in enumerate(cfg['confirm']):
+		if value <= limit and confirms >= cfms:
+			return value
+	return 0
+
+def Subscribe(addr):
+	with wallet.lock:
+		wallet.addresses.append(addr)
+		wallet.history[addr] = []
+		synchronizer.subscribe_to_addresses([addr])
+		wallet.up_to_date = False
+			
+def loadcfg():
+	global cfg
+	try:
+		with open(sys.argv[0]+'.cfg') as f:
+			cfg = pickle.load(f)
+	except IOError:
+		print logts(),'No cfg file.\n',
+	finally:
+		cfg['debug'] = False
+		options()
+
+def savecfg():
+	try:
+		with open(sys.argv[0]+'.cfg', 'w') as f:
+			pickle.dump(cfg, f)
+	except IOError:
+		print logts(),'Cannot save cfg file'
+
+def options():
+	try:                                
+		opts,args = getopt.getopt(sys.argv[1:], "hvp:c:k:g:r:d:e:u:l:i:s", 
+			["help", "version", "debug", "poll=", "confirm=", "mpk=", "gaplimit=", "db=", "server=", "user=", "log=", "pid=", "defaults" ])
+	except getopt.GetoptError:
+		usage()
+	for opt,arg in opts:
+		if opt in ("-h", "--help"):
+			usage()
+		elif opt in ("-v", "--version"):
+			sys.exit('Version: '+version)
+		elif opt in ("-p", "--poll"):
+			cfg['poll'] = int(arg)
+		elif opt in ("-c", "--confirm"):
+			l = arg.split(',') 
+			l.append(0)
+			cfg['confirm'] = [(int(l[i]), int(float(l[i+1])*1e8)) for i in range(0,len(l)-1,2)]		
+		elif opt in ("-d", "--db"):
+			cfg['db'] = arg
+			if len(arg.split(':')) != 4: cfg['db'] += ':localhost'
+		elif opt in ("-e", "--server"):
+			cfg['server'] = arg
+		elif opt in ("-k", "--mpk"):
+			cfg['mpk'] = arg
+		elif opt in ("-g", "--gaplimit"):
+			cfg['gaplimit'] = int(arg)
+		elif opt in ("-u", "--user"):
+			cfg['user'] = arg
+		elif opt in ("-l", "--log"):
+			cfg['log'] = arg
+		elif opt in ("-i", "--pid"):
+			cfg['pid'] = arg
+		elif opt in ("-s", "--defaults"):
+			savecfg()
+			print "%s updated" % (sys.argv[0]+'.cfg')
+			sys.exit()
+		elif opt in ("--debug"):
+			cfg['debug'] = True
+			
+def usage():
+	print """Command options are:\n-h,--help\tShow this help info\n-v,--version\tShow version info\n-s,--defaults\tUpdate cfg and exit\n
+Cfg file is %s.cfg\nThese options get saved in cfg file as default.
+-p,--poll\tGap limit poll interval in seconds\n-c,--confirm\tSet confirmation ranges eg. 2,0.1,6
+-k,--key\tSet Master Public Key (mpk)\n-p,--poolsize\tGap limit (minimum available addresses)\n-u,--user\tRun as user\n
+-d,--db  \tSet mysql access 'user:pwd:dbname[:host]'\n-l,--log\tSet log file path\n-i,--pid\tSet pid file path""" % sys.argv[0]
+	sys.exit(1)	
+						
+def sigterm(signum, frame):
+	print "%s SIGTERM - Shutting down" % logts()
+	db.close()
+	os.unlink(cfg['pid'])
+	sys.exit(2)
+
+def logts():
+	return datetime.datetime.now().strftime('%d-%m-%Y %H:%M:%S')
+								
+if __name__ == '__main__':
+	loadcfg()
+	if 'user' in cfg:
+		print logts(),"Running as:",cfg['user']
+		uid = pwd.getpwnam(cfg['user']).pw_uid
+		os.setgid(uid)
+		os.setuid(uid)
+	else:
+		cfg['user'] = getpass.getuser()
+	
+	if cfg['mpk'] == None:
+		print "Master Public Key (mpk) required. See README."
+	elif cfg['db'] == None:
+		print "DB settings required. See README."
+	else:
+		main()
+	

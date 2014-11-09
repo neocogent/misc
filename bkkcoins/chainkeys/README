@@ -1,0 +1,12 @@
+Bitcoin Chain Keys Utility
+
+This simple html page (with js code) can add multiple public and private keys together.
+
+Multiple users can generate key pairs and share their public keys.
+When you add the public keys you get a master address that can be paid into.
+
+Keep the private keys secret. When the funds are going to be spent you bring the secret keys all together and add them to create a master spend key.
+
+I checked the values produced in this tool against bitaddress.org and they checked out ok. But I did not try to fund and spend from the address generated.
+
+No warranty! Test fully before using.

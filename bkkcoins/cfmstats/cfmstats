@@ -1,0 +1,278 @@
+#!/usr/bin/env python
+
+import os, sys, getopt, urllib, daemon, datetime, signal, pwd, getpass, pickle
+from time import sleep
+import json
+import random
+
+version = "0.1.0"
+cfg = { 'log':sys.argv[0]+'.log', 'pid':sys.argv[0]+'.pid', 'poll':3, 'rpc_url':'http://localhost:8332', 'template':sys.argv[0]+'.tmp.html',
+        'amounts':[0.001,0.01,0.1,0.5,1,10], 'fees':[0,0.00005,0.0001,0.0005,0.001,0.005,0.01] }
+
+def calc_avg(n, t):
+    return "%.1f" % (float(n)/t)
+    
+def calc_1st(n, t):
+    return "%.0f" % (float(n)/t*100)
+
+statcalc = { 'avg':calc_avg, '1st':calc_1st }
+pending = {}
+stats = {}
+totaltx = []
+trx = 0
+
+def main():
+    if cfg['debug']:
+        run()
+    else:
+        with daemon.DaemonContext(working_directory='/home/%s/%s' % (cfg['user'],sys.argv[0]), 
+            stdout=open(cfg['log'],'a'),stderr=open(cfg['log'],'a'), signal_map={signal.SIGTERM:sigterm}):
+            run()
+
+def run():
+    global stats, totaltx, trx
+    print logts(), "Started pid:", os.getpid()
+    with file(cfg['pid'],'w') as f: f.write(str(os.getpid()))
+    try:
+        with open(sys.argv[0]+'.dat', 'r') as f:
+            stats,totaltx,trx = pickle.load(f)
+    except IOError:
+        for t in statcalc:
+            stats[t] = [[0 for j in range(len(cfg['fees'])+1)] for i in range(len(cfg['amounts'])+1)] 
+        totaltx = [[0 for j in range(len(cfg['fees'])+1)] for i in range(len(cfg['amounts'])+1)]
+        
+    last = latest = GetBlockCount()
+    print logts(), "Block", latest
+    UpdatePendingTx(0)
+    while 1:
+        UpdatePendingTx(latest)
+        latest = GetBlockCount()
+        if latest > last:
+            print logts(), "Block", latest,
+            UpdateStats(GetBlockData(latest))
+            last = latest
+        
+        sys.stdout.flush()
+        sleep(cfg['poll'])
+
+def UpdateStats(blkdata):
+    global stats, pending, totaltx, trx
+    print "Updating Stats"
+
+    for tx in blkdata['tx']:
+        for blk in pending:
+            if tx in pending[blk]:
+                amount,fee = pending[blk].pop(tx)
+                if blk == 0 or amount == 0:
+                    continue
+                i = FindBucket(cfg['amounts'], amount)
+                j = FindBucket(cfg['fees'], fee)
+                #print "cfmtx:", blk, blkdata['block_index'] - blk, amount, fee, i, j
+                stats['avg'][i][j] += (blkdata['block_index'] - blk)
+                stats['1st'][i][j] += 1 if (blkdata['block_index'] - blk) == 1 else 0
+                totaltx[i][j] += 1
+                trx += 1
+                
+    with open(sys.argv[0]+'.dat', 'w') as f:
+        pickle.dump((stats,totaltx,trx), f)
+        
+    np = 0
+    for blk in pending:
+        np += len(pending[blk])
+          
+    rowlabels = ["<= %s" % FF(e) for e in cfg['amounts']]
+    rowlabels.append('> '+str(cfg['amounts'][-1]))    
+    try:        
+        with open(cfg['template'], 'r') as f:
+            html = f.read().replace('%blockcount%', str(blkdata['block_index'])).replace('%trxcount%', str(trx)).replace('%pending%', str(np))
+            for t in statcalc:
+                htmlstats = '<table class="stats"><tr><td>Value / Fee</td><td>%s</td><td>&gt; %s</td></tr>' % ('</td><td>'.join(['0' if e == 0 else "<= %s" % FF(e) for e in cfg['fees']]), FF(cfg['fees'][-1]))
+                for r,label in enumerate(rowlabels):
+                    htmlstats += '<tr><td>%s</td><td>%s</td></tr>' % (label, '</td><td>'.join([statcalc[t](n,totaltx[r][i]) if not n == 0 else '-' for i,n in enumerate(stats[t][r])]))
+                htmlstats += '</table>'
+                html = html.replace('%%%s%%' % t, htmlstats)
+            with open('tmp.html', 'w') as h:
+                h.write(html)
+            os.rename('tmp.html', sys.argv[0]+'.html')
+    except IOError:
+        pass
+    for t in statcalc:
+        with open('tmp.csv', 'w') as f:
+            csvstats = '"Value / Fee","%s","> %s"\n' % ('","'.join(['0' if e == 0 else "<= %s" % FF(e) for e in cfg['fees']]), FF(cfg['fees'][-1]))
+            for i,row in enumerate(stats[t]):
+                csvstats += '"%s","%s"\n' % (rowlabels[i], '","'.join([statcalc[t](n,totaltx[i][x]) if not n == 0 else '0' for x,n in enumerate(stats[t][i])]))
+            f.write(csvstats)
+        os.rename('tmp.csv', sys.argv[0]+'_%s.csv' % t)
+        
+def FindBucket(L,v):
+    for i,e in enumerate(L):
+        if v <= e:
+            return i
+    return len(L)
+    
+def FF(x):
+    return ("%f" % x).rstrip('0').rstrip('.')
+    
+def SumTx(tx):
+    try:
+        postdata = json.dumps({"method": 'getrawtransaction', 'params': [tx,1], 'id':'jsonrpc'})
+        txdata = json.loads(urllib.urlopen(cfg['rpc_url'], postdata).read())
+    except IOError as err:
+        pass
+        print logts(), "Error getting transaction", err
+        return (0,0)
+        
+    outsum = insum = 0
+    if txdata['result']:
+        for outputs in txdata['result']['vout']:
+            outsum += float(outputs['value'])
+        for inputs in txdata['result']['vin']:
+            try:
+                postdata = json.dumps({"method": 'getrawtransaction', 'params': [inputs['txid'],1], 'id':'jsonrpc'})
+                vindata = json.loads(urllib.urlopen(cfg['rpc_url'], postdata).read())
+            except IOError as err:
+                pass
+                print logts(), "Error getting transaction inputs", err
+                return (0,0)
+            if vindata['result']:
+                insum += float(vindata['result']['vout'][inputs['vout']]['value'])
+                
+        if insum == 0 or outsum == 0:
+            return (0,0)
+            
+    return (outsum, insum - outsum)
+    
+def UpdatePendingTx(blk):
+    global pending
+    try:
+        postdata = json.dumps({"method": 'getrawmempool', 'params': [], 'id':'jsonrpc'})
+        pooldata = json.loads(urllib.urlopen(cfg['rpc_url'], postdata).read())
+        for tx in pooldata['result']:
+            if IsPending(tx):
+                continue
+            if blk not in pending:
+                pending[blk] = {}
+            pending[blk][tx] = SumTx(tx) if not blk == 0 else (0,0)
+    except IOError:
+        pass
+        
+def IsPending(tx):
+    global pending
+    for blk in pending:
+        if tx in pending[blk]:
+            return True
+    return False    
+
+def GetBlockCount():
+    try:
+        postdata = json.dumps({"method": 'getblockcount', 'params': [], 'id':'jsonrpc'})
+        result = json.loads(urllib.urlopen(cfg['rpc_url'], postdata).read())
+        return int(result['result'])
+    except IOError as err:
+        print logts(), "Error getting block count", err
+        pass
+    return 0
+        
+def GetBlockData(height):
+    try:
+        postdata = json.dumps({"method": 'getblockhash', 'params': [height], 'id':'jsonrpc'})
+        blkhash = json.loads(urllib.urlopen(cfg['rpc_url'], postdata).read())
+        postdata = json.dumps({"method": 'getblock', 'params': [blkhash['result']], 'id':'jsonrpc'})
+        blkdata = json.loads(urllib.urlopen(cfg['rpc_url'], postdata).read())
+        return { 'block_index': height, 'tx':blkdata['result']['tx'] }
+    except IOError:
+        print logts(), "Error getting block data", err
+        pass
+    return {}
+            
+def loadcfg():
+    global cfg
+    try:
+        with open(sys.argv[0]+'.cfg') as f:
+            ovr = pickle.load(f)
+        for c in ovr:
+            cfg[c] = ovr[c]
+    except IOError:
+        print logts(),'No cfg file.\n',
+    finally:
+        cfg['debug'] = False
+        options()
+
+def savecfg():
+    try:
+        with open(sys.argv[0]+'.cfg', 'w') as f:
+            pickle.dump(cfg, f)
+    except IOError:
+        print logts(),'Cannot save cfg file'
+
+def options():
+    try:                                
+        opts,args = getopt.getopt(sys.argv[1:], "hvdp:a:f:r:u:l:i:t:s", 
+            ["help", "version", "debug", "poll=", "amounts=", "fees=", "rpc=", "user=", "log=", "pid=", "template=", "defaults" ])
+    except getopt.GetoptError:
+        usage()
+    for opt,arg in opts:
+        if opt in ("-h", "--help"):
+            usage()
+        elif opt in ("-v", "--version"):
+            sys.exit('Version: '+version)
+        elif opt in ("-p", "--poll"):
+            cfg['poll'] = int(arg)
+        elif opt in ("-a", "--amounts"):
+            l = arg.split(',') 
+            l.append(0)
+            cfg['amounts'] = [(int(l[i]), int(float(l[i+1])*1e8)) for i in range(0,len(l)-1)]   
+        elif opt in ("-f", "--fees"):
+            l = arg.split(',') 
+            l.append(0)
+            cfg['fees'] = [(int(l[i]), int(float(l[i+1])*1e8)) for i in range(0,len(l)-1)]          
+        elif opt in ("-r", "--rpc"):
+            cfg['rpc_url'] = arg
+        elif opt in ("-u", "--user"):
+            cfg['user'] = arg
+        elif opt in ("-l", "--log"):
+            cfg['log'] = arg
+        elif opt in ("-i", "--pid"):
+            cfg['pid'] = arg
+        elif opt in ("-t", "--template"):
+            cfg['template'] = arg            
+        elif opt in ("-s", "--defaults"):
+            savecfg()
+            print "%s updated" % (sys.argv[0]+'.cfg')
+            sys.exit()
+        elif opt in ("--debug"):
+            cfg['debug'] = True
+            
+def usage():
+    print """Command options are:\n-h,--help\tShow this help info\n-v,--version\tShow version info\n-s,--defaults\tUpdate cfg and exit\n
+Cfg file is %s.cfg\nThese options get saved in cfg file as default.
+-p,--poll\tBlockchain poll time in seconds\n-a,--amounts\tSet amount column ranges\n-f,--fees\tSet fee row ranges\n-u,--user\tRun as user
+-r,--rpc\tSet bitcoind rpc-url 'http://rpcuser:rpcpwd@localhost:8332'
+-t,--template\tSelect html template file
+-l,--log\tSet log file path\n-i,--pid\tSet pid file path\n""" % sys.argv[0]
+    print "Defaults are:\nAmount ranges:", cfg['amounts'], "\nFee ranges:", cfg['fees'], "\nPoll time:", cfg['poll'], "\nTemplate:", sys.argv[0]+".tmp.html\n"
+    sys.exit(2) 
+                        
+def sigterm(signum, frame):
+    print "%s SIGTERM - Shutting down" % logts()
+    os.unlink(cfg['pid'])
+    sys.exit()
+
+def logts():
+    return datetime.datetime.now().strftime('%d-%m-%Y %H:%M:%S')
+                                
+if __name__ == '__main__':
+    loadcfg()
+    if 'user' in cfg:
+        print logts(),"Running as:",cfg['user']
+        uid = pwd.getpwnam(cfg['user']).pw_uid
+        os.setgid(uid)
+        os.setuid(uid)
+    else:
+        cfg['user'] = getpass.getuser()
+        
+    if not cfg['rpc_url']:
+        print "bitcoind rpc-url not set - Shutting down."
+        sys.exit()
+        
+    main()

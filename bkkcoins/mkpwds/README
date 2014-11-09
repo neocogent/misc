@@ -1,0 +1,16 @@
+This small password list generator was created to crack the gpg encrypted private key as described in the challenge here:
+
+https://bitcointalk.org/index.php?topic=133263.0;topicseen
+
+It takes a list from file "patterns" and substitutes every possible 4 char pwd and outputs these suitable for piping to JohnTheRipper, which can be used with GPU support to scan a gpg key hash.
+
+Compile:
+
+gcc mkpwds.c -lcrypto -o mkpwds
+
+It support two possible arguments, 
+
+mkpwds [start] [length]
+
+where start is a count of how many passwords to skip, length is how many to output before stopping.
+

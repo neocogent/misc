@@ -1,0 +1,38 @@
+#!/usr/bin/env python
+#
+# Distane, Bearing between 2 GPS co-ords
+#
+
+import sys
+from math import *
+
+def haversine(pos1, pos2):
+    lat1,long1 = pos1
+    lat2,long2 = pos2
+
+    degree_to_rad = float(pi/180.0)
+
+    d_lat = (float(lat2) - float(lat1)) * degree_to_rad
+    d_long = (float(long2) - float(long1)) * degree_to_rad
+
+	# distance
+    a = pow(sin(d_lat / 2), 2) + cos(float(lat1) * degree_to_rad) * cos(float(lat2) * degree_to_rad) * pow(sin(d_long / 2), 2)
+    c = 2 * atan2(sqrt(a), sqrt(1 - a))
+    
+    # bearing
+    y = sin(d_long) * cos(float(lat2)* degree_to_rad)
+    x = cos(float(lat1)* degree_to_rad) * sin(float(lat2)* degree_to_rad) - sin(float(lat1)* degree_to_rad) * cos(float(lat2)* degree_to_rad) * cos(d_long)
+    b = atan2(y, x) / degree_to_rad
+    
+    return 6371 * c, b if b >= 0 else b + 360
+
+if __name__ == '__main__':
+
+	if len(sys.argv) < 5:
+		print "Usage: %s <lat1> <long1> <lat2> <long2>\nValues in deg only or <deg min sec> triplets, with S,W negative. Result in km.\n" % sys.argv[0]
+		exit()
+	if len(sys.argv) > 5:
+		for n in range(4):
+			sys.argv[n+1] = float(sys.argv[n*3+1]) + float(sys.argv[n*3+2])/60 + float(sys.argv[n*3+3])/3600
+		
+	print "Distance %3.2f km, Heading %3.1f" % haversine((sys.argv[1],sys.argv[2]), (sys.argv[3], sys.argv[4]))

@@ -1,0 +1,20 @@
+#!/usr/bin/env python
+#
+# a simple filter that reads 64 HEX chars on each line stdin and outputs the WIF format on stdout
+# good for bulk conversion of random data into Bitcoin private keys
+# 
+# eg. hexdump -v -e '/1 "%02X"' -n 32 /dev/urandom | hexwif
+
+import sys, binascii, hashlib
+
+for line in sys.stdin:
+	line = line[:64]
+	alphabet="123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
+	chksum = binascii.hexlify(hashlib.sha256(hashlib.sha256(binascii.unhexlify('80'+line)).digest()).digest()[:4])
+	bn = long('80'+line+chksum, 16)
+	
+	out = ""
+	while bn >= 58:
+		bn,m = divmod(bn, 58)
+		out = alphabet[m] + out
+	print alphabet[bn] + out

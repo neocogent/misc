@@ -1,0 +1,204 @@
+#!/usr/bin/env python
+
+import os, sys, getopt, urllib, daemon, datetime, signal, pwd, getpass, pickle
+from time import sleep
+import MySQLdb as mdb
+import json
+
+version = "0.2.0"
+cfg = { 'log':sys.argv[0]+'.log', 'pid':sys.argv[0]+'.pid', 'poll':60, 'confirm': [(2,1e7),(6,0)], 'block':215700 }
+
+def main():
+	if cfg['debug']:
+		run()
+	else:
+		with daemon.DaemonContext(working_directory='/home/%s/'%cfg['user'],stdout=open(cfg['log'],'a'),stderr=open(cfg['log'],'a'),
+			signal_map={signal.SIGTERM:sigterm}):
+			run()
+
+def run():
+	print logts(), "Started pid:", os.getpid()
+	with file(cfg['pid'],'w') as f: f.write(str(os.getpid()))
+	while 1:
+		
+		latest = GetBlockCount()
+		max,_ = cfg['confirm'][-1]
+		if latest-max > cfg['block']:
+			print logts(), "Block", CheckBlock(cfg['block'])
+			cfg['block'] += 1
+		elif cfg['block'] < latest:
+			msg = []
+			for n,(cfms,limit) in enumerate(cfg['confirm']):
+				msg.append(CheckBlock(latest - cfms, limit))
+			if msg: print logts(), "Block", ','.join(msg)
+			cfg['block'] = latest
+		savecfg()
+		sys.stdout.flush()
+		sleep(cfg['poll'])
+		
+def CheckBlock(height, limit=0):
+	data = GetBlockData(height)
+	for block in data['blocks']:
+		if block['main_chain']:
+			Check4Pmts(block, limit)
+	return "%s < %s " % (height, float(limit)/1e8 if limit else 'All')
+	
+def Check4Pmts(block, limit):
+	u,p,n,h = cfg['db'].split(':')
+	db = mdb.connect(h,u,p,n)
+	cur = db.cursor()
+	for tx in block['tx']:
+		for pmt in tx['out']:
+			if limit == None or pmt['value'] <= limit:
+				cur.execute("select id from users where address=%s limit 1;", pmt['addr'])
+				if cur.rowcount == 1:
+					kid, = cur.fetchone()
+					cur.execute("select id from pmts where trxhash=%s limit 1;", tx['hash'])
+					if cur.rowcount == 0:
+						print "Posted:", pmt['addr'], float(pmt['value'])/1e8
+						cur.execute("insert into pmts (uid,trxhash,blockidx,amount,received) values (%s,%s,%s,%s,now());", 
+							(kid, tx['hash'], block['block_index'], pmt['value']))
+						cur.execute("update users set balance=balance+%s where id=%s;", (pmt['value'], kid))
+						UpdateJobStatus(cur, kid)
+	cur.close()
+	db.close()
+	
+def UpdateJobStatus(cur, kid):
+	cur.execute("select balance from users where id=%s;", kid)
+	balance, = cur.fetchone()
+	cur.execute("select id,fee from jobs where uid=%s and status<3 order by status desc,id desc;", kid)
+	if cur.rowcount > 0:
+		jobs = cur.fetchall()
+		for job in jobs:
+			jid,fee = job
+			if fee*1e3 <= balance:
+				balance -= fee*1e3
+				cur.execute("update jobs set status=1 where id=%s and status=0;", jid)
+
+def GetBlockCount():
+	if cfg['rpc_url']:
+		try:
+			postdata = json.dumps({"method": 'getblockcount', 'params': [], 'id':'jsonrpc'})
+			result = json.loads(urllib.urlopen(cfg['rpc_url'], postdata).read())
+			return int(result['result'])
+		except IOError as err:
+			print logts(), "Error getting block count", err
+			pass
+	try:
+		count = int(urllib.urlopen("http://blockchain.info/q/getblockcount").read())
+	except IOError as err:	
+		print logts(), "Error getting block count", err
+	return count
+		
+def GetBlockData(height):
+	if cfg['rpc_url']:
+		txlist = []
+		try:
+			postdata = json.dumps({"method": 'getblockhash', 'params': [height], 'id':'jsonrpc'})
+			blkhash = json.loads(urllib.urlopen(cfg['rpc_url'], postdata).read())
+			postdata = json.dumps({"method": 'getblock', 'params': [blkhash['result']], 'id':'jsonrpc'})
+			blkdata = json.loads(urllib.urlopen(cfg['rpc_url'], postdata).read())
+			for tx in blkdata['result']['tx']:
+				postdata = json.dumps({"method": 'getrawtransaction', 'params': [tx,1], 'id':'jsonrpc'})
+				txdata = json.loads(urllib.urlopen(cfg['rpc_url'], postdata).read())
+				if txdata['result']:
+					txouts = []
+					for out in txdata['result']['vout']:
+						if out['scriptPubKey']['type'] == 'pubkeyhash':
+							txouts.append( { 'addr': out['scriptPubKey']['addresses'][0], 'value': int(out['value']*1e8) } )
+					txlist.append( { 'hash': tx, 'out': txouts } )
+			return { 'blocks':[ {'main_chain':True, 'block_index': height,'tx':txlist} ] }
+		except IOError:
+			pass
+	try:
+		data = json.load(urllib.urlopen("http://blockchain.info/block-height/%s?format=json" % height))
+		#return json.load(open('test-block.json', 'r'))
+	except IOError as err:	
+		print logts(), "Error getting block data", err
+	return data	
+			
+def loadcfg():
+	global cfg
+	try:
+		with open(sys.argv[0]+'.cfg') as f:
+			cfg = pickle.load(f)
+	except IOError:
+		print logts(),'No cfg file.\n',
+	finally:
+		cfg['debug'] = False
+		options()
+
+def savecfg():
+	try:
+		with open(sys.argv[0]+'.cfg', 'w') as f:
+			pickle.dump(cfg, f)
+	except IOError:
+		print logts(),'Cannot save cfg file'
+
+def options():
+	try:                                
+		opts,args = getopt.getopt(sys.argv[1:], "hvb:p:c:r:d:u:l:i:s", 
+			["help", "version", "debug", "block=", "poll=", "confirm=", "rpc=", "db=", "user=", "log=", "pid=", "defaults" ])
+	except getopt.GetoptError:
+		usage()
+	for opt,arg in opts:
+		if opt in ("-h", "--help"):
+			usage()
+		elif opt in ("-v", "--version"):
+			sys.exit('Version: '+version)
+		elif opt in ("-b", "--block"):
+			cfg['block'] = int(arg)			
+		elif opt in ("-p", "--poll"):
+			cfg['poll'] = int(arg)
+		elif opt in ("-c", "--confirm"):
+			l = arg.split(',') 
+			l.append(0)
+			cfg['confirm'] = [(int(l[i]), int(float(l[i+1])*1e8)) for i in range(0,len(l)-1,2)]		
+		elif opt in ("-r", "--rpc"):
+			cfg['rpc_url'] = arg
+		elif opt in ("-d", "--db"):
+			cfg['db'] = arg
+			if len(arg.split(':')) != 4: cfg['db'] += ':localhost'
+		elif opt in ("-u", "--user"):
+			cfg['user'] = arg
+		elif opt in ("-l", "--log"):
+			cfg['log'] = arg
+		elif opt in ("-i", "--pid"):
+			cfg['pid'] = arg
+		elif opt in ("-s", "--defaults"):
+			savecfg()
+			print "%s updated" % (sys.argv[0]+'.cfg')
+			sys.exit()
+		elif opt in ("--debug"):
+			cfg['debug'] = True
+			
+def usage():
+	print """Command options are:\n-h,--help\tShow this help info\n-v,--version\tShow version info\n-s,--defaults\tUpdate cfg and exit\n
+Cfg file is %s.cfg\nThese options get saved in cfg file as default.
+-b,--block\tStart at block#\n-p,--poll\tBlockchain poll time in seconds\n-c,--confirm\tSet confirmation breaks eg. 2,0.1,6\n-u,--user\tRun as user
+-r,--rpc\tSet bitcoind rpc-url 'http://rpcuser:rpcpwd@localhost:8332'\n-d,--db  \tSet mysql access 'user:pwd:dname[:host]'
+-l,--log\tSet log file path\n-i,--pid\tSet pid file path""" % sys.argv[0]
+	sys.exit(2)	
+						
+def sigterm(signum, frame):
+	print "%s SIGTERM - Shutting down" % logts()
+	os.unlink(cfg['pid'])
+	sys.exit()
+
+def logts():
+	return datetime.datetime.now().strftime('%d-%m-%Y %H:%M:%S')
+								
+if __name__ == '__main__':
+	loadcfg()
+	if 'user' in cfg:
+		print logts(),"Running as:",cfg['user']
+		uid = pwd.getpwnam(cfg['user']).pw_uid
+		os.setgid(uid)
+		os.setuid(uid)
+	else:
+		cfg['user'] = getpass.getuser()
+		
+	if cfg['db'] == None:
+		print "DB settings required. See README."
+	else:
+		main()

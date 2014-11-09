@@ -1,0 +1,50 @@
+----------------------
+      sudo2svg
+----------------------
+
+sudo2svg takes sudoku puzzles in one-line format and creates svg and pdf pages.
+
+Usage: sudo2svg svg-template [dest-svg] [pdf]
+
+I have also provided 6 basic svg template files: 1 up, 2up, 6up layouts in A4 and Letter size pages.
+
+An svg template is just a normal svg file with a comment element indicating where the puzzle numbers should be inserted. This allows creating all sorts of fancy page designs that sudo2svg can insert a grid of numbers into.
+
+When you provide more than 1 puzzle line as input the puzzles are inserted sequentially into the svg file. If more puzzles than can fit into a tmeplate are provided then multiple svg output pagea are created. However, using stdout redirection only a single file can be created and overflow will create an invalid svg file.
+
+For this reason a dest-svg base name can be provided and the sequence of svg files created (with multiple puzzles each) will be numbered from 0 upwards, eg. page0.svg, page1.svg etc. 
+
+If you add the pdf option at the end and have Inkscape drawing program installed then it can convert the resulting svg files into PDF documents as well. This allows creating easily printable puzzle books especially if you use some of the page imposition features of Adobe Reader when printing.
+
+Here are some exmaples using the qqwing generator (available seperately):
+
+qqwing --generate 2 --one-line |sud2svg sudo2a4.svg >puzzle.svg
+(Create one page with 2 puzzles)
+
+qqwing --generate 18 --one-line |sud2svg sudo6a4.svg page
+(Generates three pages with 6 puzzles each named page0.svg, page1.svg, page2.svg)
+
+qqwing --generate 6 --one-line --difficulty expert |sud2svg sudo6a4.svg page pdf
+(Generates one page with 6 puzzles named page0.svg and a PDF version named page0.pdf)
+
+sudo2svg should work with any one-line puzzle source.
+
+----------------------
+    render.sudoku
+----------------------
+
+Also included here is my Inkscape extenstion script in Python.
+
+To install in Inkscape extract the 2 render.sudoku files along with the svg-tempates into your /usr/share/inkscape/extensions directory.
+
+Start Inkscape and you will see a new render extension called Sudoku.
+
+You can set options for rows/cols of puzzle layout on one page, and for border/background colors etc. You can also choose difficulty level for puzzles.
+
+Click "Apply" and an array of puzzles will be placed into your page.
+
+I've now added qqwing to this repo for ease of use. It is distrubted under the GPL and the original code is available here: http://ostermiller.org/qqwing/ 
+
+Have fun!
+
+

@@ -1,0 +1,46 @@
+<!DOCTYPE html> 
+<html lang="en"> 
+<head>
+    <meta charset="utf-8">
+    <title>Bitcoin Key Chains Utility</title>
+
+<script src="bitcoinjs-min.js"></script>
+<script language=javascript>
+function addPubKeys() {
+	var keys = document.getElementById("pubkeys").value.split("\n");
+	var curve = getSECCurveByName("secp256k1").getCurve();
+	var result = Crypto.util.hexToBytes(keys[0]);
+	keys.splice(0,1);
+	keys.map(function(k){
+		if (k != "") {
+			var akey = ECPointFp.decodeFrom(curve, Crypto.util.hexToBytes(k));
+			result = ECPointFp.decodeFrom(curve, result).add(akey).getEncoded(0);
+		}
+	})
+	var addr = new Bitcoin.Address(Bitcoin.Util.sha256ripe160(result));
+	document.getElementById("resultPub").innerHTML = addr.toString();
+    }
+function addPrivKeys() {
+	var keys = document.getElementById("privkeys").value.split("\n");
+	var result = BigInteger.fromByteArrayUnsigned(Bitcoin.ECKey.decodeString(keys[0]));
+	keys.splice(0,1);
+	keys.map(function(k){
+		if (k != "") {
+			var akey = BigInteger.fromByteArrayUnsigned(Bitcoin.ECKey.decodeString(k));
+			result = result.add(akey).mod(getSECCurveByName('secp256k1').getN());
+		}
+	})
+	document.getElementById("resultPriv").innerHTML = new Bitcoin.ECKey(result).getExportedPrivateKey();
+    }
+</script>
+</head>
+<body>
+Enter multiple public keys here (one per line):<br>
+<textarea id="pubkeys" rows="5" cols="90"></textarea><br>
+<input value="Calculate Master Address" onclick="javascript:addPubKeys();" type="button"><br><br>
+<div id="resultPub"></div><br>
+Enter multiple private keys here (one per line):<br>
+<textarea id="privkeys" rows="5" cols="90"></textarea><br><br>
+<input value="Calculate Master Key" onclick="javascript:addPrivKeys();" type="button"><br><br>
+<div id="resultPriv"></div>
+</body>
