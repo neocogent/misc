@@ -6,9 +6,9 @@
 # Outputs the SEED and MPK for restoring to Electrum.
 # SEED for full wallet, MPK for watch only wallet.
 # eg.
-#     hexdump -v -e '/1 "%02X"' -n 16 /dev/urandom | genkeys
+#     hexdump -v -e '/1 "%02X"' -n 16 /dev/urandom | jskeys
 # or
-#     echo "1279666de665e6c662d2f45538842acd" | genkeys
+#     echo "1279666de665e6c662d2f45538842acd" | jskeys
 #
 # Optionally given an index and count it also will 
 # generate key/address pairs. Arguments are,

@@ -1,0 +1,26 @@
+// ==UserScript==
+// @name        CollapseChangeTips
+// @namespace   yourspacehere
+// @description Collapse changetips
+// @include     http://www.reddit.com/r/Bitcoin/comments/*/*
+// @version     1
+// @grant       none
+// ==/UserScript==
+var txts = document.getElementsByClassName('usertext-body');
+for (var i = 0; i < txts.length; i++) {
+  var ps = txts[i].getElementsByTagName('p');
+  if (ps[0]) {
+    var chk = ps[0].innerHTML.toLowerCase().indexOf('/u/changetip');
+    if (chk > - 1 && chk < 50) {
+      comment = txts[i].parentNode.parentNode.parentNode;
+      comment.className = comment.className.replace(/(?:^|\s)noncollapsed(?!\S)/g, ' collapsed');
+    }
+  }
+}
+var cfms = document.getElementsByClassName('author');
+for (var i = 0; i < cfms.length; i++) {
+  if (cfms[i].innerHTML.indexOf('changetip') > - 1) {
+    comment = cfms[i].parentNode.parentNode.parentNode;
+    comment.className = comment.className.replace(/(?:^|\s)noncollapsed(?!\S)/g, ' collapsed');
+  }
+}
