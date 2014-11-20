@@ -1,0 +1,10 @@
+#!/bin/bash
+
+if [ -z "$1" ]; then
+  zbarcam --raw |xclip -selection c
+elif [ "$1" = "btc" ]; then
+  zbarcam --raw |sed 's/.*\://' |xclip -selection c
+else
+  zbarimg -q --raw "$1" |xclip -selection c
+fi
+

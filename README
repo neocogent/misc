@@ -1,10 +1,13 @@
 Place to put small code scraps and pull in other small repos.
 
+scripts:
+	qrclip - capture qr code from webcam/img to clipboard
+	entropy - monitor entropy available by showing every 1 second
+
 greasemonkey:
 	collapsetips - script to collapse ChangeTips on /r/bitcoin
 
-From other repos/gists:
-
-subgit	 	 - nice script for easily managing sub-projects (like these)
-bkkcoins 	 - useful stuff for Bitcoin
+from other repos/gists:
+	subgit - nice script for easily managing sub-projects (like these)
+	bkkcoins - useful stuff for Bitcoin
 

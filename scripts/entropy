@@ -1,0 +1,8 @@
+#!/usr/bin/env python
+ 
+import time
+ 
+while True:
+    with open('/proc/sys/kernel/random/entropy_avail', 'r') as f:
+        print(f.read().rstrip())
+    time.sleep(1.0)
