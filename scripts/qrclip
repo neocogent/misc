@@ -1,10 +1,32 @@
-#!/bin/bash
+#!/usr/bin/python
 
-if [ -z "$1" ]; then
-  zbarcam --raw |xclip -selection c
-elif [ "$1" = "btc" ]; then
-  zbarcam --raw |sed 's/.*\://' |xclip -selection c
-else
-  zbarimg -q --raw "$1" |xclip -selection c
-fi
+# need zbar and clipboard python modules, try pip install
 
+from sys import argv
+import zbar, clipboard
+
+# create a Processor
+proc = zbar.Processor()
+
+# configure the Processor
+proc.parse_config('enable')
+
+# initialize the Processor
+device = '/dev/video0'
+if len(argv) > 2:
+    device = argv[2]
+proc.init(device)
+
+# enable the preview window
+proc.visible = True
+
+# read at least one barcode (or until window closed)
+proc.process_one()
+
+# hide the preview window
+proc.visible = False
+
+# extract results
+for symbol in proc.results:
+	clipboard.copy(symbol.data if argv[1] != 'strip' else symbol.data.split(':')[-1])
+    
