@@ -1,0 +1,60 @@
+#!/usr/bin/env python
+
+import sys, hashlib
+
+b58 = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz'
+
+def b58encode(addr):
+    global b58
+    long_value = 0L
+    for (i, c) in enumerate(addr[::-1]):
+        long_value += (256**i) * ord(c)
+
+    result = ''
+    while long_value >= 58:
+        div, mod = divmod(long_value, 58)
+        result = b58[mod] + result
+        long_value = div
+    result = b58[long_value] + result
+
+    nPad = 0
+    for c in addr:
+        if c == '\0': nPad += 1
+        else: break
+
+    return (b58[0]*nPad) + result
+    
+def b58hex(s58):
+	num = 0L
+	for (i, c) in enumerate(s58[::-1]):
+		num += b58.find(c) * (58**i)
+	return '%x' % num
+
+
+if len(sys.argv) < 1:
+	print "Usage: %s <desired address>\n" % sys.argv[0]
+	sys.exit(1)
+
+if 0 in [c in b58 for c in sys.argv[1]]:
+	
+	fix = [("l","1"),("O","o"),("I","i"),("0","o")]
+	for (s,r) in fix:
+		sys.argv[1] = sys.argv[1].replace(s,r)
+	if 0 in [c in b58 for c in sys.argv[1]]:
+		print "Invalid characters in address, cannot fix"
+		sys.exit(1)
+	print "Fixed invalid characters in address"
+
+hx = '00%x' % (long(b58hex(sys.argv[1]), 16)*long(b58hex("2"+"1"*(33-len(sys.argv[1]))), 16))
+if len(hx) % 2 == 1:
+	hx = "0" + hx
+addrhx = hx[0:42] + hashlib.sha256(hashlib.sha256(hx[0:42].decode('hex')).digest()).digest()[0:4].encode('hex')
+
+#print addrhx
+print b58encode(addrhx.decode('hex')),
+print "Valid" if addrhx[-8:].decode('hex') == hashlib.sha256(hashlib.sha256(addrhx[:-8].decode('hex')).digest()).digest()[:4] else "Failed"
+
+	
+
+
+
