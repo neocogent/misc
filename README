@@ -3,6 +3,8 @@ Place to put small code scraps and pull in other small repos.
 scripts:
 	qrclip - capture qr code from webcam/img to clipboard
 	entropy - monitor entropy available by showing every 1 second
+	keyscan - brute force a Bitcoin private key (wif) for single digit typos
+	supernova - generate a Bitcoin black hole address matching prefix
 
 greasemonkey:
 	collapsetips - script to collapse ChangeTips on /r/bitcoin

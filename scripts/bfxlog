@@ -1,0 +1,130 @@
+#!/usr/bin/python
+
+import os, sys, getopt, daemon, time, datetime, signal, pwd, getpass, pickle
+import json, requests
+
+version = "0.1.0"
+api_url = "https://api.bitfinex.com/v1/trades/btcusd?timestamp=%d"
+cfg = { 'poll':60, 'log':sys.argv[0]+'.json', 'pid':sys.argv[0]+'.pid' }
+
+def main():
+	if not 'last' in cfg:
+		resetlog()
+	if cfg['debug']:
+		try:
+			run()
+		except KeyboardInterrupt:
+			sys.exit(1)
+	else:
+		with daemon.DaemonContext(working_directory='.', stdout=open(sys.argv[0]+'.log','a'), stderr=open(sys.argv[0]+'.log','a'), 
+				signal_map={signal.SIGTERM:sigterm}):
+			run()
+			
+def run():
+	print logts(), "Started pid:", os.getpid()
+	with file(cfg['pid'],'w') as f: f.write(str(os.getpid()))
+	sys.stdout.flush()
+	while 1:
+		update()
+		sys.stdout.flush()
+		time.sleep(cfg['poll'])
+				
+def update():
+	try:
+		r = requests.get(api_url % cfg['last']['timestamp'])
+		if r.status_code == requests.codes.ok:
+			data = r.json()
+			if data[0]:
+				with open(cfg['log'], "r+") as f:
+					f.seek (-1, os.SEEK_END)
+					if cfg['last']['tid'] > 0:
+						f.write(',')
+					for trade in data[::-1]:
+						if trade['tid'] > cfg['last']['tid']:
+							f.write(json.dumps(trade))
+							f.write(',')
+					f.seek (-1, os.SEEK_END)
+					f.write(']')
+				cfg['last'] = data[0]
+				savecfg()
+				print logts(), "Updated tid:", cfg['last']['tid']
+	except requests.exceptions.ConnectionError:
+		pass
+
+def loadcfg():
+	global cfg
+	try:
+		with open(sys.argv[0]+'.cfg') as f:
+			cfg = pickle.load(f)
+	except IOError:
+		print logts(),'No cfg file.\n',
+	finally:
+		cfg['debug'] = False
+		options()
+
+def savecfg():
+	try:
+		with open(sys.argv[0]+'.cfg', 'w') as f:
+			pickle.dump(cfg, f)
+	except IOError:
+		print logts(),'Cannot save cfg file'
+
+def options():
+	try:                                
+		opts,args = getopt.getopt(sys.argv[1:], "hvrp:u:l:i:s", 
+			["help", "version", "debug", "reset", "poll=", "user=", "log=", "pid=", "defaults" ])
+	except getopt.GetoptError:
+		usage()
+	for opt,arg in opts:
+		if opt in ("-h", "--help"):
+			usage()
+		elif opt in ("-v", "--version"):
+			sys.exit('Version: '+version)
+		elif opt in ("-p", "--poll"):
+			cfg['poll'] = int(arg)
+		elif opt in ("-u", "--user"):
+			cfg['user'] = arg
+		elif opt in ("-l", "--log"):
+			cfg['log'] = arg
+		elif opt in ("-i", "--pid"):
+			cfg['pid'] = arg
+		elif opt in ("-r", "--reset"):		
+			resetlog()
+		elif opt in ("-s", "--defaults"):
+			savecfg()
+			print "%s updated" % (sys.argv[0]+'.cfg')
+			sys.exit()
+		elif opt in ("--debug"):
+			cfg['debug'] = True
+
+def usage():
+	print """Command options are:\n-h,--help\tShow this help info\n-v,--version\tShow version info\n-s,--defaults\tUpdate cfg and exit\n
+Cfg file is %s.cfg\nThese options get saved in cfg file as default.\n-r,--reset\tReset last trade id to 0, truncate log file\n
+-p,--poll\tPoll interval in seconds\n-u,--user\tRun as user\n-l,--log\tSet log file path
+-i,--pid\tSet pid file path""" % sys.argv[0]
+	sys.exit(1)	
+
+def sigterm(signum, frame):
+	print "%s SIGTERM - Shutting down" % logts()
+	os.unlink(cfg['pid'])
+	sys.exit(2)
+	
+def logts():
+	return datetime.datetime.now().strftime('%d-%m-%Y %H:%M:%S')
+		
+def resetlog():
+	cfg['last'] = { 'timestamp':0, 'tid':0 }
+	savecfg()
+	with open(cfg['log'], "w") as f:
+		f.write("[]")
+
+if __name__ == '__main__':
+	loadcfg()
+	if 'user' in cfg:
+		print logts(),"Running as:",cfg['user']
+		uid = pwd.getpwnam(cfg['user']).pw_uid
+		os.setgid(uid)
+		os.setuid(uid)
+	
+	main()
+		
