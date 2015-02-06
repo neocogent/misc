@@ -1,0 +1,20 @@
+#!/bin/bash
+
+pwd="test123test456"
+
+while [ 1 ]
+do
+  hex=`hexdump -v -e '/1 "%02X"' -n 32 /dev/urandom`
+  
+  bip38=`echo $hex |keyfmt %e $pwd`
+  
+  echo $bip38
+  
+  chk=`echo $bip38 |keyfmt %h $pwd`
+
+  if [ "$chk" != "$hex" ]; then
+    echo "TEST FAILED"
+    echo $hex
+    break
+  fi
+done
