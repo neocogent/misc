@@ -169,7 +169,7 @@ for seed in sys.stdin:
             priv_key = ('%064x' %  ((secexp + seq(i, c, mpk_str)) % _r) ).decode('hex')
             (x,y) = ptAdd(mpk, ptMul((_Gx,_Gy), seq(i, c, mpk_str)))
             pub_key_str = '04' + ('%064x' % x) + ('%064x' % y)
-            print "m/%d/%d %s,%s" % (c,i, private_key_to_wif( chr((0+128)&255) + priv_key ), public_key_to_address( pub_key_str ))
+            print "m/%d/%d %s,%s" % (c,i, private_key_to_wif( '\x80' + priv_key ), public_key_to_address( pub_key_str ))
 
         
         

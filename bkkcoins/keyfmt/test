@@ -9,12 +9,12 @@ do
   bip38=`echo $hex |keyfmt %e $pwd`
   
   echo $bip38
+  echo $hex |keyfmt "%w\n%a\n"
   
   chk=`echo $bip38 |keyfmt %h $pwd`
 
   if [ "$chk" != "$hex" ]; then
     echo "TEST FAILED"
-    echo $hex
     break
   fi
 done

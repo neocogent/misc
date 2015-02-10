@@ -99,7 +99,7 @@ for seed in sys.stdin:
             priv_key = ( '%064x' % ((secexp + seq(i, c, master_public_key)) % _r) ).decode('hex')
             pubkey = master_private_key.get_verifying_key().pubkey.point + seq(i, c, master_public_key) * generator_secp256k1
             pub_key_str = '04' + ecdsa.VerifyingKey.from_public_point( pubkey, curve = SECP256k1 ).to_string().encode('hex')
-            out += "{\"m/%d/%d\":[\"%s\",\"%s\"]},\n" % (c,i,private_key_to_wif( chr((0+128)&255) + priv_key ), public_key_to_address( pub_key_str ))
+            out += "{\"m/%d/%d\":[\"%s\",\"%s\"]},\n" % (c,i,private_key_to_wif( '\x80' + priv_key ), public_key_to_address( pub_key_str ))
             
     print out[:-2] + ("\n]}" if argc > 1 else "}")
 
