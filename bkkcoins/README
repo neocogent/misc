@@ -6,7 +6,7 @@ Bitcoin:
 chainkeys - Web page for combining multi-key chains.
 coinwatch - Simple payments daemon updates mysql tables (bitcoind/blockchain.info).
 epmtd	  - Simple payments daemon using only mysql table (Electrum MPK based).
-keyfmt	  - Convert private key as Hex, WIF, Pubkey, Address cmd line tool.
+keyfmt	  - Convert private key: Hex, WIF, BIP38, Pubkey, Address cmd line tool.
 hexwif 	  - Convert Bitcoin hex private key to WIF format cmd line tool.
 mkpwds	  - Password list generator for gpg private key challenge. 
 mickey	  - Simple cmd line Bitcoin key generator based on keyconv.
@@ -22,7 +22,7 @@ eckeys    - as above, no ecdsa import - EC math explicit using builtins
 
 Other:
 sudoku	  - Inkscape extension (and bash script) to create SVG/PDF sudoku puzzles. 
-gps       - Caluclate distance between two GPS co-ords.
+gps       - Calculate distance between two GPS co-ords.
 b2b       - Convert between bases using in/out alphabets.
 
 
