@@ -2,7 +2,12 @@
 #
 # Insert addresses from stdin in Electrum 2.0 watch-only wallet.
 # Create wallet if doesn't exist.
+# 
+# Process a csv file with addresses in a column using,
 #
+# cut test_list -f2 -s -d, | watchaddr test_wallet
+#
+# where, column index is 2, delimiter is comma, change to suit
 
 import sys, json
 
