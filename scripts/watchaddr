@@ -1,0 +1,43 @@
+#!/usr/bin/env python
+#
+# Insert addresses from stdin in Electrum 2.0 watch-only wallet.
+# Create wallet if doesn't exist.
+#
+
+import sys, json
+
+empty = "{\"accounts\": {\"/x\": {\"imported\": { } } },\"wallet_type\": \"imported\" }"
+
+if len(sys.argv) < 2:
+    print "Usage: %s <wallet file>\n\nRead addresses from stdin and create/update wallet." % sys.argv[0]
+    print "Creates or updates an Electrum 2.0 'watch-only' wallet with imported addresses."
+    sys.exit(1)
+
+try:
+	with open(sys.argv[1]) as json_file:
+		wallet = json.load(json_file)
+except IOError:
+	wallet = json.loads(empty)
+
+if wallet["wallet_type"] != "imported":
+	sys.stdin.read()
+	sys.exit("Error: Not a watch-only wallet.")
+
+for line in sys.stdin:
+	line = line.replace(' ', '').replace('\n', '')
+	if line[0] == '1' or line[0] == '3':
+		wallet["accounts"]["/x"]["imported"][line] = [None,None]
+		print "Added:", line
+
+with open(sys.argv[1], 'w') as json_file:
+	json.dump(wallet, json_file, indent=4)
+
+		
+    
+
+
+
+
+
+    
+

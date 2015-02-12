@@ -5,6 +5,7 @@ scripts:
 	entropy - monitor entropy available by showing every 1 second
 	keyscan - brute force a Bitcoin private key (wif) for single digit typos
 	supernova - generate a Bitcoin black hole address matching prefix
+	watchaddr - insert addresses from stdin into Electrum (2.0) watch-only wallet
 
 greasemonkey:
 	collapsetips - script to collapse ChangeTips on /r/bitcoin
