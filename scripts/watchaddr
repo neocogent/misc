@@ -5,21 +5,30 @@
 # 
 # Process a csv file with addresses in a column using,
 #
-# cut test_list -f2 -s -d, | watchaddr test_wallet
+# cut test_list -f2 -s -d, | watchaddr -- test_wallet
 #
 # where, column index is 2, delimiter is comma, change to suit
+#
+# or if one address per line, simply,
+#
+# watchaddr test_list test_wallet
+#
 
 import sys, json
 
 empty = "{\"accounts\": {\"/x\": {\"imported\": { } } },\"wallet_type\": \"imported\" }"
 
-if len(sys.argv) < 2:
-    print "Usage: %s <wallet file>\n\nRead addresses from stdin and create/update wallet." % sys.argv[0]
+if len(sys.argv) < 3:
+    print "Usage: %s <address file> <wallet file>\n\nRead addresses from file and create/update wallet." % sys.argv[0]
     print "Creates or updates an Electrum 2.0 'watch-only' wallet with imported addresses."
+    print "Use -- for <address file> to read from stdin."
     sys.exit(1)
+    
+if sys.argv[1] != "--":
+	sys.stdin = open(sys.argv[1], 'r')
 
 try:
-	with open(sys.argv[1]) as json_file:
+	with open(sys.argv[2]) as json_file:
 		wallet = json.load(json_file)
 except IOError:
 	wallet = json.loads(empty)
@@ -34,10 +43,9 @@ for line in sys.stdin:
 		wallet["accounts"]["/x"]["imported"][line] = [None,None]
 		print "Added:", line
 
-with open(sys.argv[1], 'w') as json_file:
+with open(sys.argv[2], 'w') as json_file:
 	json.dump(wallet, json_file, indent=4)
 
-		
     
 
 
