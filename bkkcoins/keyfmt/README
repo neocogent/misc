@@ -5,6 +5,7 @@
 
  %h = HEX privkey
  %w = WIF privkey
+ %e = BIP38 encrypted key
  %p = public key
  %a = address
 
@@ -15,6 +16,10 @@
 
      od -An -N32 -xw32 /dev/random | keyfmt "%a:%w"
 
-Thsi generate a brain wallet compatible with bitaddress.org:
+ This generates a brain wallet compatible with bitaddress.org:
 
-	echo -n "this is my brain on drugs"|openssl sha256|cut -c 10-|keyfmt %a:%w
+	 echo -n "this is my brain on drugs"|openssl sha256|cut -c 10-|keyfmt %a:%w
+
+ This generates a new BIP38 encrypted key and address:
+
+     hexdump -v -e '/1 "%02X"' -n 32 /dev/urandom | keyfmt "%e\n%a" test123
