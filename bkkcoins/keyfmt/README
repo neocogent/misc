@@ -1,5 +1,6 @@
  Read a private key from stdin and output formatted data values.
- Input one key per line either hex (64 chars) or WIF key (51 base-58 chars).
+ Input one key per line either hex (64 chars) or WIF (51 base58 chars),
+ or BIP38 (uncompressed) format.
 
  The format argument can contain variables:
 
@@ -23,3 +24,7 @@
  This generates a new BIP38 encrypted key and address:
 
      hexdump -v -e '/1 "%02X"' -n 32 /dev/urandom | keyfmt "%e\n%a" test123
+
+ Or a BIP38 key from rolled casino dice:
+ 
+     echo 12342325436231425342643524|openssl sha256|cut -c 10-|keyfmt "%e\n%a" test123
