@@ -19,6 +19,7 @@ mkseeds   - Create Electrum seeds from hex input or generate with addresses.
 genkeys   - Generate MPK, key/address pairs from an Electrum seed (offline use).
 jskeys    - same as above, output as JSON object 
 eckeys    - as above, no ecdsa import - EC math explicit using builtins
+rawkeys   - only private keys, one per line for feeding into keyfmt util
 
 Other:
 sudoku	  - Inkscape extension (and bash script) to create SVG/PDF sudoku puzzles. 

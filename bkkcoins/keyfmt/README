@@ -19,7 +19,7 @@
 
  This generates a brain wallet compatible with bitaddress.org:
 
-	 echo -n "this is my brain on drugs"|openssl sha256|cut -c 10-|keyfmt %a:%w
+     echo -n "this is my brain on drugs"|openssl sha256|cut -c 10-|keyfmt %a:%w
 
  This generates a new BIP38 encrypted key and address:
 
