@@ -5,16 +5,46 @@ pwd="test123test456"
 while [ 1 ]
 do
   hex=`hexdump -v -e '/1 "%02X"' -n 32 /dev/urandom`
+  echo -e "[ "$hex" ]\n"
   
+  # uncompressed bip38 key
   bip38=`echo $hex |keyfmt %e $pwd`
-  
   echo $bip38
   echo $hex |keyfmt "%w\n%a\n"
-  
   chk=`echo $bip38 |keyfmt %h $pwd`
-
   if [ "$chk" != "$hex" ]; then
     echo "TEST FAILED"
-    break
+    exit
   fi
+  
+  # compressed bip38 key
+  bip38c=`echo $hex |keyfmt -c %e $pwd`
+  echo $bip38c
+  echo $hex |keyfmt -c "%w\n%a\n"
+  chk=`echo $bip38c |keyfmt %h $pwd`
+  if [ "$chk" != "$hex" ]; then
+    echo "TEST FAILED"
+    exit
+  fi  
+  
+  # uncompressed wif key
+  wif=`echo $hex |keyfmt %w`
+  echo $wif
+  echo $hex |keyfmt "%a\n"
+  chk=`echo $wif |keyfmt %h`
+  if [ "$chk" != "$hex" ]; then
+    echo "TEST FAILED"
+    exit
+  fi
+  
+  # compressed wif key
+  wif=`echo $hex |keyfmt -c %w`
+  echo $wif
+  echo $hex |keyfmt -c "%a\n"
+  chk=`echo $wif |keyfmt %h`
+  if [ "$chk" != "$hex" ]; then
+    echo "TEST FAILED"
+    exit
+  fi
+  
 done

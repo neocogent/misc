@@ -1,10 +1,14 @@
 #!/usr/bin/env python
 #
 # Read a private key from stdin and output formatted data values.
-# Input one key per line either hex (64 chars) or WIF (51 base58 chars),
-# or BIP38 (uncompressed) format.
+# Input one key per line either hex (64 chars) or WIF (base58 chars),
+# or BIP38 format.
 #
-# The format argument can contain variables:
+# Usage: keyfmt [-c] <format> [bip38pwd]
+#
+# optional: -c indicates to output compressed keys/addrs
+#
+# The format argument can contains these variables:
 #
 # %h = hex privkey
 # %w = WIF privkey
@@ -26,11 +30,12 @@
 # BIP38 code adapted from https://github.com/bpdavenport/btc
 #
 
-import sys, binascii, hashlib
+import sys, binascii, hashlib, string
 
 if len(sys.argv) < 2:
-    print "Usage: %s <format string> [BIP38 password]\n\nRead a private key from stdin and output formatted data." % sys.argv[0]
-    print "Uncompressed Hex, WIF and BIP38 private keys are supported.\n"
+    print "Usage: %s [-c] <format string> [BIP38 password]\n\nRead a private key from stdin and output formatted data." % sys.argv[0]
+    print "Hex, WIF and BIP38 private keys are supported.\n"
+    print "optional -c indicates to output compressed key/addrs\n"
     print "These format tokens are supported:\n%h = HEX privkey\n%w = WIF privkey\n%e = BIP38 encrypted key\n%p = public key\n%a = address\n" 
     print "eg. hexdump -v -e '/1 \"%02X\"' -n 32 /dev/urandom | keyfmt \"%a:%w\"\ngenerates a random key suitable for Electrum import\n"
     sys.exit(1)
@@ -50,6 +55,11 @@ def b58hex(s58):
         num += alphabet.find(c) * (58**i)       
     return hex(num)[2:-1].upper()
     
+def priv2pub(priv, compress=False):
+    verkey = ecdsa.SigningKey.from_secret_exponent(long(priv, 16), curve=SECP256k1 ).get_verifying_key()
+    prefix = '04' if not compress else ( '03' if verkey.pubkey.point.y() % 2 == 1 else '02' )
+    return prefix + ( '%032x' % verkey.pubkey.point.x() if compress else verkey.to_string() )
+    
 def mkaddr(pubkey):
     pad = ""
     rmd = hashlib.new('ripemd160')
@@ -60,16 +70,17 @@ def mkaddr(pubkey):
         else: break
     return b58encode(long(binascii.hexlify(an + hashlib.sha256(hashlib.sha256(an).digest()).digest()[0:4]), 16), pad)
 
-def bip38_encrypt(privkey, addr, passphrase):
+def bip38_encrypt(privkey, addr, passphrase, compress=False):
     from Crypto.Cipher import AES
     import scrypt
-    
+
     addresshash = hashlib.sha256(hashlib.sha256(addr).digest()).digest()[0:4]
+    compress = '\xe0' if compress else '\xc0'
     key = scrypt.hash(passphrase, addresshash, 16384, 8, 8)
     aes = AES.new(key[32:64])
     encryptedhalf1 = aes.encrypt(binascii.unhexlify('%0.32x' % (long(privkey[0:32], 16) ^ long(binascii.hexlify(key[0:16]), 16))))
     encryptedhalf2 = aes.encrypt(binascii.unhexlify('%0.32x' % (long(privkey[32:64], 16) ^ long(binascii.hexlify(key[16:32]), 16))))
-    encrypted_privkey = ('\x01\x42' + '\xc0' + addresshash + encryptedhalf1 + encryptedhalf2)
+    encrypted_privkey = ('\x01\x42' + compress + addresshash + encryptedhalf1 + encryptedhalf2)
     encrypted_privkey += hashlib.sha256(hashlib.sha256(encrypted_privkey).digest()).digest()[:4]
     return b58encode(long(binascii.hexlify(encrypted_privkey), 16))
                 
@@ -78,17 +89,16 @@ def bip38_decrypt(encrypted_privkey, passphrase):
     import scrypt
     
     data = binascii.unhexlify("0"+b58hex(encrypted_privkey))
-    if data[2] != '\xc0':
-        sys.exit("Compressed keys not supported")
+    compress = '' if data[2] == '\xc0' else '01'
     key = scrypt.hash(passphrase, data[3:7], 16384, 8, 8)
     aes = AES.new(key[32:64])
     priv = aes.decrypt(data[7:23]) + aes.decrypt(data[23:39])
     priv = '%064x' % (long(binascii.hexlify(priv), 16) ^ long(binascii.hexlify(key[0:32]), 16))
-    pub = chr(4) + ecdsa.SigningKey.from_secret_exponent(long(priv, 16), curve=SECP256k1 ).get_verifying_key().to_string()
+    pub = priv2pub(priv, data[2] != '\xc0')
     if hashlib.sha256(hashlib.sha256(mkaddr(pub)).digest()).digest()[0:4] != data[3:7]:
-        print('BIP38 verification failed! Password is likely incorrect.')
+        sys.exit('BIP38 verification failed! Password is likely incorrect.')
     chksum = binascii.hexlify(hashlib.sha256(hashlib.sha256(binascii.unhexlify('80'+priv)).digest()).digest()[:4])
-    return b58encode(long('80'+priv+chksum, 16))
+    return b58encode(long('80'+priv+chksum+compress, 16))
     
 import ecdsa
 
@@ -104,21 +114,26 @@ generator_secp256k1 = ecdsa.ellipticcurve.Point( curve_secp256k1, _Gx, _Gy, _r )
 oid_secp256k1 = (1,3,132,0,10)
 SECP256k1 = ecdsa.curves.Curve("SECP256k1", curve_secp256k1, generator_secp256k1, oid_secp256k1 ) 
 
+compress = sys.argv[1] == '-c'
+arg1 = 2 if compress else 1
+
 for line in sys.stdin:
     line = line.replace(' ', '').replace('\n', '')
-    if len(sys.argv) > 2 and line[0] == '6' and len(line) < 64:
-        line = bip38_decrypt(line, sys.argv[2])
-    line = b58hex(line[:51])[2:-8] if line[0] == '5' and len(line) < 64 else line[:64]
-    
+    if len(sys.argv) > arg1+1 and line[0] == '6' and len(line) < 64:
+        line = bip38_decrypt(line, sys.argv[arg1+1])
+    line = b58hex(line)[2:] if not all(c in string.hexdigits for c in line) and len(line) < 64 else line
+    compress = True if len(line) > 72 else compress
+    line = line[:64]
+
     chksum = binascii.hexlify(hashlib.sha256(hashlib.sha256(binascii.unhexlify('80'+line)).digest()).digest()[:4])
-    privkey = long('80'+line+chksum, 16)
-    pubkey = chr(4) + ecdsa.SigningKey.from_secret_exponent(long(line, 16), curve=SECP256k1 ).get_verifying_key().to_string()
+    privkey = long('80'+line+chksum+('01' if compress else ''), 16)
+    pubkey = priv2pub(line, compress)
     addr = mkaddr(pubkey)
     
-    out = sys.argv[1].replace('%h', line).replace('%w', b58encode(privkey))
+    out = sys.argv[arg1].replace('%h', line).replace('%w', b58encode(privkey))
     out = out.replace('%p', binascii.hexlify(pubkey).upper()).replace('%a', addr)
-    if len(sys.argv) > 2:
-        bip38key = bip38_encrypt(line, addr, sys.argv[2])
+    if len(sys.argv) > arg1+1:
+        bip38key = bip38_encrypt(line, addr, sys.argv[arg1+1], compress)
         out = out.replace('%e', bip38key)   
     print out.decode('string-escape')
     
