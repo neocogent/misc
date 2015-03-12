@@ -2,7 +2,7 @@
  Input one key per line either hex (64 chars) or WIF (base58 chars),
  or BIP38 format.
  
- **Usage: keyfmt [-c] <format> [bip38pwd]**
+ Usage: keyfmt [-c] <format> [bip38pwd]
  
  optional: -c indicates to output compressed keys/addrs
 
