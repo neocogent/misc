@@ -89,18 +89,17 @@ for seed in sys.stdin:
     out = "{\"seed\":\"%s\",\n \"mpk\":\"%s\",\n" % (seed, master_public_key.encode('hex'))
     
     argc = len(sys.argv)
-    if argc > 1:
-        out += " \"keys\":[\n"
-        count = 5 if argc < 2 else int(sys.argv[1])
-        chg = 0 if argc < 3 else int(sys.argv[2])
-        index = 0 if argc < 4 else int(sys.argv[3])
+    out += " \"keys\":[\n"
+    count = 5 if argc < 2 else int(sys.argv[1])
+    chg = 0 if argc < 3 else int(sys.argv[2])
+    index = 0 if argc < 4 else int(sys.argv[3])
 
-        for (i,c) in [(n,0) for n in range(index,index+count)]+[(n,1) for n in range(index,index+chg)]:
-            priv_key = ( '%064x' % ((secexp + seq(i, c, master_public_key)) % _r) ).decode('hex')
-            pubkey = master_private_key.get_verifying_key().pubkey.point + seq(i, c, master_public_key) * generator_secp256k1
-            pub_key_str = '04' + ecdsa.VerifyingKey.from_public_point( pubkey, curve = SECP256k1 ).to_string().encode('hex')
-            out += "{\"m/%d/%d\":[\"%s\",\"%s\"]},\n" % (c,i,private_key_to_wif( '\x80' + priv_key ), public_key_to_address( pub_key_str ))
-            
+    for (i,c) in [(n,0) for n in range(index,index+count)]+[(n,1) for n in range(index,index+chg)]:
+        priv_key = ( '%064x' % ((secexp + seq(i, c, master_public_key)) % _r) ).decode('hex')
+        pubkey = master_private_key.get_verifying_key().pubkey.point + seq(i, c, master_public_key) * generator_secp256k1
+        pub_key_str = '04' + ecdsa.VerifyingKey.from_public_point( pubkey, curve = SECP256k1 ).to_string().encode('hex')
+        out += "{\"m/%d/%d\":[\"%s\",\"%s\"]},\n" % (c,i,private_key_to_wif( '\x80' + priv_key ), public_key_to_address( pub_key_str ))
+        
     print out[:-2] + ("\n]}" if argc > 1 else "}")
 
          
