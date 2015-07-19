@@ -13,10 +13,14 @@
 #
 # watchaddr test_list test_wallet
 #
+# Text preceding or following will be added as a label
+# if separated by ':' or ' '.
+#
 
 import sys, json
 
-empty = "{\"accounts\": {\"/x\": {\"imported\": { } } },\"wallet_type\": \"imported\" }"
+empty = "{\"accounts\": {\"/x\": {\"imported\": { } } },\"labels\":{},\"wallet_type\": \"imported\" }"
+labelsep = ':'
 
 if len(sys.argv) < 3:
     print "Usage: %s <address file> <wallet file>\n\nRead addresses from file and create/update wallet." % sys.argv[0]
@@ -25,26 +29,32 @@ if len(sys.argv) < 3:
     sys.exit(1)
     
 if sys.argv[1] != "--":
-	sys.stdin = open(sys.argv[1], 'r')
+    sys.stdin = open(sys.argv[1], 'r')
 
 try:
-	with open(sys.argv[2]) as json_file:
-		wallet = json.load(json_file)
+    with open(sys.argv[2]) as json_file:
+        wallet = json.load(json_file)
 except IOError:
-	wallet = json.loads(empty)
+    wallet = json.loads(empty)
 
 if wallet["wallet_type"] != "imported":
-	sys.stdin.read()
-	sys.exit("Error: Not a watch-only wallet.")
+    sys.stdin.read()
+    sys.exit("Error: Not a watch-only wallet.")
 
 for line in sys.stdin:
-	line = line.replace(' ', '').replace('\n', '')
-	if line[0] == '1' or line[0] == '3':
-		wallet["accounts"]["/x"]["imported"][line] = [None,None]
-		print "Added:", line
+    line = line.replace('\n', '')
+    if line[0] == '1' or line[0] == '3':
+        addr,_,label = line.partition(labelsep if (labelsep in line) else ' ')
+    else:
+        label,_,addr = line.partition(labelsep if (labelsep in line) else ' ')
+    if addr:
+        wallet["accounts"]["/x"]["imported"][addr] = [None,None]
+    if label:
+        wallet["labels"][addr] = label
+    print "Added:", addr, label
 
 with open(sys.argv[2], 'w') as json_file:
-	json.dump(wallet, json_file, indent=4)
+    json.dump(wallet, json_file, indent=4)
 
     
 

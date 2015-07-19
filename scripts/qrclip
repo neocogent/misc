@@ -28,5 +28,5 @@ proc.visible = False
 
 # extract results
 for symbol in proc.results:
-	clipboard.copy(symbol.data if argv[1] != 'strip' else symbol.data.split(':')[-1])
+	clipboard.copy(symbol.data if 'strip' in argv else symbol.data.split(':')[-1])
     
