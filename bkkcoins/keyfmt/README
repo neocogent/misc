@@ -15,7 +15,7 @@
  %a = address
 
  eg. "Address: %a\nPrivkey: %w" outputs a format like the vanitygen program
-     "a:%w" outputs a format good for importing to Electrum
+     "%a:%w" outputs a format good for importing to Electrum
  
  This generates a new key for importing to Electrum:
 

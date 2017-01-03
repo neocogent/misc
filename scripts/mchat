@@ -1,0 +1,45 @@
+#!/usr/bin/env python
+#
+#   Test multicast peering
+#
+import socket,struct,sys,threading
+
+server_addr = '0.0.0.0'
+multicast_addr = '224.69.0.1'
+port = 6666
+
+sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+
+def listen():
+    
+    membership = socket.inet_aton(multicast_addr) + socket.inet_aton(server_addr)
+    sock.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, membership)
+    sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    sock.bind((server_addr,port))
+
+    print 'waiting to receive'
+    while True:
+        try:
+            data, addr = sock.recvfrom(255)
+        except socket.timeout:
+            print 'timed out'
+        print '%s %s' % (data, addr)
+
+server = threading.Thread(target=listen)
+server.setDaemon(True)
+server.start()
+
+sock.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, struct.pack('b', 1))
+sock.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_LOOP, struct.pack('b', 0))   
+
+try:
+    while True:
+        line = sys.stdin.readline().rstrip('\n')
+        sock.sendto(line, (multicast_addr,port))
+        
+except KeyboardInterrupt:
+    print 'closing socket'
+    sock.close()
+    sys.exit(1)
+    
+    
