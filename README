@@ -6,9 +6,12 @@ scripts:
 	keyscan - brute force a Bitcoin private key (wif) for single digit typos
 	supernova - generate a Bitcoin black hole address matching prefix
 	watchaddr - insert addresses from stdin into Electrum (2.0) watch-only wallet
+    mchat - test multicast local network peer messaging
+    pwscan - simple Electrum password cracker
 
 greasemonkey:
 	collapsetips - script to collapse ChangeTips on /r/bitcoin
+    bitcoinwisdom - script to add USD on Chinese exchanges
 
 from other repos/gists:
 	subgit - nice script for easily managing sub-projects (like these)
