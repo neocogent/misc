@@ -12,6 +12,7 @@ scripts:
 greasemonkey:
 	collapsetips - script to collapse ChangeTips on /r/bitcoin
 	bitcoinwisdom - script to add USD on Chinese exchanges
+    reddit-btc-ticker - script to add BTC price ticker on /r/bitcoin
 
 from other repos/gists:
 	subgit - nice script for easily managing sub-projects (like these)
