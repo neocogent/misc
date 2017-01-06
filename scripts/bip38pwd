@@ -1,0 +1,109 @@
+#!/usr/bin/env python
+#
+# BIP38 password scanner
+#
+
+import sys, time
+import aes, hashlib, base64, binascii, ecdsa
+
+wildchar = '?'
+pwd_chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
+
+alphabet="123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
+
+# secp256k1, http://www.oid-info.com/get/1.3.132.0.10
+_p = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2FL
+_r = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141L
+_b = 0x0000000000000000000000000000000000000000000000000000000000000007L
+_a = 0x0000000000000000000000000000000000000000000000000000000000000000L
+_Gx = 0x79BE667EF9DCBBAC55A06295CE870B07029BFCDB2DCE28D959F2815B16F81798L
+_Gy = 0x483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8L
+curve_secp256k1 = ecdsa.ellipticcurve.CurveFp( _p, _a, _b )
+generator_secp256k1 = ecdsa.ellipticcurve.Point( curve_secp256k1, _Gx, _Gy, _r )
+oid_secp256k1 = (1,3,132,0,10)
+SECP256k1 = ecdsa.curves.Curve("SECP256k1", curve_secp256k1, generator_secp256k1, oid_secp256k1 ) 
+
+def b58encode(num, pad=''):
+    out = ''
+    while num >= 58:
+        num,m = divmod(num, 58)
+        out = alphabet[m] + out
+    return pad + alphabet[num] + out
+    
+def b58hex(s58):
+    num = 0L
+    for (i, c) in enumerate(s58[::-1]):
+        num += alphabet.find(c) * (58**i)       
+    return hex(num)[2:-1].upper()
+
+def priv2pub(priv, compress=False):
+    verkey = ecdsa.SigningKey.from_secret_exponent(long(priv, 16), curve=SECP256k1 ).get_verifying_key()
+    prefix = '04' if not compress else ( '03' if verkey.pubkey.point.y() % 2 == 1 else '02' )
+    return prefix + ( '%032x' % verkey.pubkey.point.x() if compress else verkey.to_string() )
+    
+def mkaddr(pubkey):
+    pad = ""
+    rmd = hashlib.new('ripemd160')
+    rmd.update(hashlib.sha256(pubkey).digest())
+    an = chr(0) + rmd.digest()
+    for c in an:
+        if c == '\0': pad += '1'
+        else: break
+    return b58encode(long(binascii.hexlify(an + hashlib.sha256(hashlib.sha256(an).digest()).digest()[0:4]), 16), pad)
+    
+def bip38_decrypt(encrypted_privkey, passphrase):
+    from Crypto.Cipher import AES
+    import scrypt
+    
+    data = binascii.unhexlify("0"+b58hex(encrypted_privkey))
+    compress = '' if data[2] == '\xc0' else '01'
+    key = scrypt.hash(passphrase, data[3:7], 16384, 8, 8)
+    aes = AES.new(key[32:64])
+    priv = aes.decrypt(data[7:23]) + aes.decrypt(data[23:39])
+    priv = '%064x' % (long(binascii.hexlify(priv), 16) ^ long(binascii.hexlify(key[0:32]), 16))
+    pub = priv2pub(priv, data[2] != '\xc0')
+    if hashlib.sha256(hashlib.sha256(mkaddr(pub)).digest()).digest()[0:4] != data[3:7]:
+        return None
+    chksum = binascii.hexlify(hashlib.sha256(hashlib.sha256(binascii.unhexlify('80'+priv)).digest()).digest()[:4])
+    return b58encode(long('80'+priv+chksum+compress, 16))
+    
+def pwd_subst(pwd):
+    if pwd.count(wildchar) == 1:
+        p = pwd.find(wildchar)
+        for c in pwd_chars:
+            print pwd[:p]+c+pwd[p+1:]
+            privkey = bip38_decrypt( sys.argv[2], pwd[:p]+c+pwd[p+1:] )
+            if privkey == None:
+                continue
+            else:
+                print "\nPWD:", pwd[:p]+c+pwd[p+1:]
+                print "KEY:", privkey
+                print "Took %.1f seconds" % (time.time() - started,)
+                sys.exit(0)
+    else:
+        p = pwd.find(wildchar)
+        for c in pwd_chars:
+            pwd_subst(pwd[:p]+c+pwd[p+1:])
+    
+if len(sys.argv) < 3:
+    print "BIP38 password scanner"
+    print "Template char is: %s" % wildchar
+    print "Char set is: %s" % pwd_chars
+    print "Example template: myPwd%s%s123" % (wildchar,wildchar)
+    print "Usage: %s <pwd template> <BIP38 encoded key>\n" % sys.argv[0]
+    sys.exit(0)
+if sys.argv[1].count(wildchar) == 0:
+    print "Need at least one %s in template" % wildchar
+    sys.exit(0)
+
+started = time.time()
+pwd_subst(sys.argv[1])
+
+print "Password not found"
+
+
+    
+
+
+
+
