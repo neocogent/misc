@@ -1,23 +1,23 @@
 Place to put small code scraps and pull in other small repos.
 
 scripts:
-	qrclip - capture qr code from webcam/img to clipboard
-	entropy - monitor entropy available by showing every 1 second
-	keyscan - brute force a Bitcoin private key (wif) for single digit typos
-	supernova - generate a Bitcoin black hole address matching prefix
-	watchaddr - insert addresses from stdin into Electrum (2.0) watch-only wallet
-	mchat - test multicast local network peer messaging
-	pwscan - simple Electrum password cracker, wild char sub.
+    qrclip - capture qr code from webcam/img to clipboard
+    entropy - monitor entropy available by showing every 1 second
+    keyscan - brute force a Bitcoin private key (wif) for single digit typos
+    supernova - generate a Bitcoin black hole address matching prefix
+    watchaddr - insert addresses from stdin into Electrum (2.0) watch-only wallet
+    mchat - test multicast local network peer messaging
+    pwscan - simple Electrum password cracker, wild char sub.
     pwscanx - simple Electrum password cracker, wild char sub. (multi-processing)
     bip38pwd - simple BIP38 password cracker, wild char sub.
     bip38scan - simple BIP38 password cracker, token selection
 
 greasemonkey:
-	collapsetips - script to collapse ChangeTips on /r/bitcoin
-	bitcoinwisdom - script to add USD on Chinese exchanges
+    collapsetips - script to collapse ChangeTips on /r/bitcoin
+    bitcoinwisdom - script to add USD on Chinese exchanges
     reddit-btc-ticker - script to add BTC price ticker on /r/bitcoin
 
 from other repos/gists:
-	subgit - nice script for easily managing sub-projects (like these)
-	bkkcoins - useful stuff for Bitcoin
+    subgit - nice script for easily managing sub-projects (like these)
+    bkkcoins - useful stuff for Bitcoin
 
