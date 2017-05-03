@@ -8,6 +8,7 @@ scripts:
 	watchaddr - insert addresses from stdin into Electrum (2.0) watch-only wallet
 	mchat - test multicast local network peer messaging
 	pwscan - simple Electrum password cracker, wild char sub.
+    pwscanx - simple Electrum password cracker, wild char sub. (multi-processing)
     bip38pwd - simple BIP38 password cracker, wild char sub.
     bip38scan - simple BIP38 password cracker, token selection
 

@@ -1,0 +1,85 @@
+#!/usr/bin/env python
+#
+# Electrum password scanner (multi-processing)
+#
+
+import sys, time
+import aes, hashlib, base64
+import multiprocessing
+
+wildchar = '?'
+pwd_chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
+
+def sha256(x):
+    return hashlib.sha256(x).digest()
+    
+def scanonce(pwd):
+    p = pwd.find(wildchar)
+    for c in pwd_chars:
+        try:
+            the_xprv = aes.decryptData(sha256(sha256(pwd[:p]+c+pwd[p+1:])), base64.b64decode(sys.argv[2])).decode("utf8")
+        except Exception:
+            pass
+        else:
+            if the_xprv != "":
+                print "\nPWD:", pwd[:p]+c+pwd[p+1:]
+                print "XPRV:", the_xprv
+                print "Took %.1f seconds" % (time.time() - started,)
+                sys.exit(2)
+    
+def pwd_subst(pwd):
+    global done, procs
+    if len(procs) == max_procs:
+        for p in procs:
+            p.join()
+            if p.exitcode == 2:
+                done = True
+        procs = []
+    if not done:
+        if pwd.count(wildchar) == 1:
+            sys.stdout.write('.')
+            sys.stdout.flush()
+            proc = multiprocessing.Process(target = scanonce, args = (pwd,))
+            procs.append(proc)
+            proc.start()
+        else:
+            p = pwd.find(wildchar)
+            for c in pwd_chars:
+                pwd_subst(pwd[:p]+c+pwd[p+1:])
+
+
+if __name__ == '__main__':
+
+    max_procs = multiprocessing.cpu_count()
+    procs = []
+    done = False
+    
+    if len(sys.argv) < 3:
+        print "Electrum wallet password scanner"
+        print "Template char is: %s" % wildchar
+        print "Char set is: %s" % pwd_chars
+        print "Example template: myPwd%s%s123" % (wildchar,wildchar)
+        print "1 wildcard ~ few seconds, 2 wildcards ~ few minutes, each added one ~ 60 times longer..."
+        print "Usage: %s <pwd template> <xprv from wallet file>\n" % sys.argv[0]
+        sys.exit(0)
+    if sys.argv[1].count(wildchar) == 0:
+        print "Need at least one %s in template" % wildchar
+        sys.exit(0)
+    
+    started = time.time()
+    pwd_subst(sys.argv[1])
+    
+    for p in procs:
+        p.join()
+        if p.exitcode == 2:
+            done = True
+                            
+    if not done:
+        print "Password not found"
+
+
+    
+
+
+
+
