@@ -3,8 +3,8 @@
 # Electrum password scanner
 #
 
-import sys, time
-import aes, hashlib, base64
+import sys, time, base64, hashlib
+from Crypto.Cipher import AES
 
 wildchar = '?'
 pwd_chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
@@ -14,18 +14,17 @@ def sha256(x):
 
 def pwd_subst(pwd):
     if pwd.count(wildchar) == 1:
-        sys.stdout.write('.')
         sys.stdout.flush()
         p = pwd.find(wildchar)
         for c in pwd_chars:
             try:
-                the_xprv = aes.decryptData(sha256(sha256(pwd[:p]+c+pwd[p+1:])), base64.b64decode(sys.argv[2])).decode("utf8")
+                the_xprv = AES.new(sha256(sha256(pwd[:p]+c+pwd[p+1:])), AES.MODE_CBC, xprv[:16]).decrypt(xprv[16:]).decode("utf8")
             except Exception:
                 pass
             else:
                 if the_xprv != "":
                     print "\nPWD:", pwd[:p]+c+pwd[p+1:]
-                    print "XPRV:", the_xprv
+                    print "XPRV:", the_xprv[:-ord(the_xprv[-1])]
                     print "Took %.1f seconds" % (time.time() - started,)
                     sys.exit(0)
     else:
@@ -39,20 +38,21 @@ if len(sys.argv) < 3:
     print "Char set is: %s" % pwd_chars
     print "Example template: myPwd%s%s123" % (wildchar,wildchar)
     print "@ prefix means load templates (one per line) from file and scan each"
-    print "1 wildcard ~ few seconds, 2 wildcards ~ few minutes, each added one ~ 60 times longer..."
+    print "3 wildcard ~ few seconds, each added one ~ 57 times longer..."
     print "Usage: %s <pwd template> <xprv from wallet file>\n" % sys.argv[0]
     sys.exit(0)
 if sys.argv[1][0] != '@' and sys.argv[1].count(wildchar) == 0:
     print "Need at least one %s in template" % wildchar
     sys.exit(0)
 
+xprv = base64.b64decode(sys.argv[2])
 started = time.time()
 if sys.argv[1][0] != '@':
     pwd_subst(sys.argv[1])
 else:
     tmps = [ line.rstrip('\n') for line in open(sys.argv[1][1:]) ]
     for t in tmps:
-        print "\nChecking", t
+        print "Checking", t
         pwd_subst(t)
 
 print "Password not found"

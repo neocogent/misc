@@ -7,8 +7,8 @@ scripts:
     supernova - generate a Bitcoin black hole address matching prefix
     watchaddr - insert addresses from stdin into Electrum (2.0) watch-only wallet
     mchat - test multicast local network peer messaging
-    pwscan - simple Electrum password cracker, wild char sub.
-    pwscanx - simple Electrum password cracker, wild char sub. (multi-processing)
+    pwscan - simple Electrum password cracker, wild char sub. (needs pycrypto)
+    pwscanx - simple Electrum password cracker, wild char sub. (multi-processing)(needs pycrypto)
     bip38pwd - simple BIP38 password cracker, wild char sub.
     bip38scan - simple BIP38 password cracker, token selection
 
