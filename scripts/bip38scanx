@@ -1,13 +1,10 @@
 #!/usr/bin/env python
 #
-# BIP38 password scanner
+# BIP38 password scanner with tokens
 #
 
-import sys, time
+import sys, time, multiprocessing
 import hashlib, base64, binascii, ecdsa
-
-wildchar = '?'
-pwd_chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
 
 alphabet="123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
 
@@ -67,39 +64,63 @@ def bip38_decrypt(encrypted_privkey, passphrase):
     chksum = binascii.hexlify(hashlib.sha256(hashlib.sha256(binascii.unhexlify('80'+priv)).digest()).digest()[:4])
     return b58encode(long('80'+priv+chksum+compress, 16))
     
-def pwd_subst(pwd):
-    if pwd.count(wildchar) == 1:
-        p = pwd.find(wildchar)
-        for c in pwd_chars:
-            print pwd[:p]+c+pwd[p+1:]
-            privkey = bip38_decrypt( sys.argv[2], pwd[:p]+c+pwd[p+1:] )
-            if privkey == None:
-                continue
-            else:
-                print "\nPWD:", pwd[:p]+c+pwd[p+1:]
-                print "KEY:", privkey
-                print "Took %.1f seconds" % (time.time() - started,)
-                sys.exit(0)
-    else:
-        p = pwd.find(wildchar)
-        for c in pwd_chars:
-            pwd_subst(pwd[:p]+c+pwd[p+1:])
+def scanproc(pwd):
+    for token in tokens:
+        privkey = bip38_decrypt( sys.argv[2], pwd+token )
+        if privkey == None:
+            continue
+        else:
+            print "\nPWD:", pwd+token
+            print "KEY:", privkey
+            print "Took %.1f seconds" % (time.time() - started,)
+            sys.exit(2)
     
-if len(sys.argv) < 3:
-    print "BIP38 password scanner"
-    print "Template char is: %s" % wildchar
-    print "Char set is: %s" % pwd_chars
-    print "Example template: myPwd%s%s123" % (wildchar,wildchar)
-    print "Usage: %s <pwd template> <BIP38 encoded key>\n" % sys.argv[0]
-    sys.exit(0)
-if sys.argv[1].count(wildchar) == 0:
-    print "Need at least one %s in template" % wildchar
-    sys.exit(0)
+def pwd_scan(pwd, depth):
+    global done, procs
+    if len(procs) == max_procs:
+        for p in procs:
+            p.join()
+            if p.exitcode == 2:
+                done = True
+        procs = []
+    if not done:
+        if depth == 0:
+            proc = multiprocessing.Process(target = scanproc, args = (pwd,))
+            procs.append(proc)
+            proc.start()
+        else:
+            for token in tokens:
+                pwd_scan(pwd+token, depth-1)
 
-started = time.time()
-pwd_subst(sys.argv[1])
-
-print "Password not found"
+if __name__ == '__main__':
+    
+    max_procs = multiprocessing.cpu_count()
+    procs = []
+    done = False   
+     
+    if len(sys.argv) < 3:
+        print "BIP38 password scanner (multi-processing)"
+        print "Reads tokens from file and tries every combination as password for BIP38 key"
+        print "Default depth is 6. ie. scan up to 6 token combinations."
+        print "Usage: %s <token file> <BIP38 encoded key> [depth]\n" % sys.argv[0]
+        sys.exit(0)
+    
+    with open(sys.argv[1]) as f:
+        tokens = f.read()
+    tokens = tokens.split()
+    
+    started = time.time()
+    depth = int(sys.argv[3]) if len(sys.argv) > 3 else 6
+    for n in range(depth):
+        pwd_scan("", n)
+    
+    for p in procs:
+        p.join()
+        if p.exitcode == 2:
+            done = True
+                            
+    if not done:
+        print "Password not found"
 
 
     

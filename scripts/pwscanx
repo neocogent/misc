@@ -44,7 +44,6 @@ def pwd_subst(pwd):
         procs = []
     if not done:
         if pwd.count(wildchar) <= 2:
-            sys.stdout.flush()
             proc = multiprocessing.Process(target = scanproc, args = (pwd,))
             procs.append(proc)
             proc.start()

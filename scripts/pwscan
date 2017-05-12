@@ -14,7 +14,6 @@ def sha256(x):
 
 def pwd_subst(pwd):
     if pwd.count(wildchar) == 1:
-        sys.stdout.flush()
         p = pwd.find(wildchar)
         for c in pwd_chars:
             try:
