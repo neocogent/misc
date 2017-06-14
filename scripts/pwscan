@@ -17,12 +17,13 @@ def pwd_subst(pwd):
         p = pwd.find(wildchar)
         for c in pwd_chars:
             try:
-                the_xprv = AES.new(sha256(sha256(pwd[:p]+c+pwd[p+1:])), AES.MODE_CBC, xprv[:16]).decrypt(xprv[16:]).decode("utf8")
+                the_xprv = AES.new(sha256(sha256(pwd[:p]+c+pwd[p+1:])), AES.MODE_CBC, xprv[:16]).decrypt(xprv[16:32]).decode("utf8")
             except Exception:
                 pass
             else:
-                if the_xprv != "":
+                if the_xprv[:4] == "xprv":
                     print "\nPWD:", pwd[:p]+c+pwd[p+1:]
+                    the_xprv = AES.new(sha256(sha256(pwd[:p]+c+pwd[p+1:])), AES.MODE_CBC, xprv[:16]).decrypt(xprv[16:]).decode("utf8")
                     print "XPRV:", the_xprv[:-ord(the_xprv[-1])]
                     print "Took %.1f seconds" % (time.time() - started,)
                     sys.exit(0)
