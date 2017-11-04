@@ -3,7 +3,7 @@
 # Electrum password scanner (multi-processing)
 #
 
-import sys, time, base64, hashlib, multiprocessing
+import sys, time, base64, hashlib, multiprocessing, json
 from Crypto.Cipher import AES
 
 wildchar = '?'
@@ -32,9 +32,10 @@ def test(pwd):
         pass
     else:
         if the_xprv[:4] == "xprv":
-            the_xprv = AES.new(sha256(sha256(pwd)), AES.MODE_CBC, xprv[:16]).decrypt(xprv[16:]).decode("utf8")
             print "\nPWD:", pwd
-            print "XPRV:", the_xprv[:-ord(the_xprv[-1])]
+            if len(xprv) > 33:
+                the_xprv = AES.new(sha256(sha256(pwd)), AES.MODE_CBC, xprv[:16]).decrypt(xprv[16:]).decode("utf8")
+                print "XPRV:", the_xprv[:-ord(the_xprv[-1])]
             print "Took %.1f seconds" % (time.time() - started,)
             sys.exit(2)
     
@@ -96,31 +97,41 @@ if __name__ == '__main__':
     done = False
     
     if len(sys.argv) < 3:
-        print "Electrum wallet password scanner (multiprocessing)"
-        print "Default wild char is: %s" % wildchar
-        print "Default charset is: %s" % pwd_chars
-        print "Example template: myPwd%s%s123" % (wildchar,wildchar)
-        print "\n@ template prefix means load templates (one per line) from file and scan each"
-        print "If charset provided then first char is wild char; if - then value skipped and default is used"  
-        print "If depth is provided then templates from file are used as tokens combined to that depth"
-        print "Tokens can contain wild chars but when combined will greatly increase search time"
-        print "A wild char followed by ':' uses char groups, ':' ends, where:"
-        print "\tu=upper case, l=lowercase, a=alpha (u+l), n=numeric, s=symbols"
-        print "\teg. myPwd%s:ls:123 scans only lower case and symbols" % wildchar
-        print "\nUsage: %s <pwd template> <xprv from wallet file> [charset] [depth]\n" % sys.argv[0]
+        print "\nElectrum wallet password scanner (multiprocessing)\n"
+        print "  Supports only wallets created pre Electrum 2.8.0"
+        print "  As few as 44 chars from xprv allows finding pwd without exposing xprv to theft"
+        print "\nUsage: %s <pwd template> <xprv or @wallet-file> [charset] [depth]\n" % sys.argv[0]
+        print "  Default wild char is: %s" % wildchar
+        print "  Default charset is: %s" % pwd_chars
+        print "  Example pwd template: myPwd%s%s123" % (wildchar,wildchar)
+        print "\n  @ template prefix means load templates (one per line) from file, iterates all wild chars"
+        print "  @ xprv prefix means load wallet file and parse to get xprv"
+        
+        print "  If charset provided then first char is wild char; if - then charset skipped and default is used\n"  
+        print "  If depth is provided then templates from file are used as tokens combined to that depth"
+        print "  Tokens can contain wild chars but when combined will multiply search time\n"
+        print "  A wild char followed by ':' uses char groups, ':' ends, where:"
+        print "    \tu=upper case, l=lowercase, a=alpha (u+l), n=numeric, s=symbols"
+        print "    \teg. myPwd%s:ls:123 scans only lower case and symbols" % wildchar
+        print 
+        
         sys.exit(0)
         
     if sys.argv[1][0] != '@' and sys.argv[1].count(wildchar) == 0:
         print "Need at least one %s in template" % wildchar
         sys.exit(0)
         
+    if sys.argv[2][0] == '@':
+        with open(sys.argv[2][1:]) as f:
+            xprv = base64.b64decode(json.load(f)['keystore']['xprv'])
+    else:
+        xprv = base64.b64decode(sys.argv[2])
+        
     if len(sys.argv) > 3 and sys.argv[3][0] != '-':
         wildchar = sys.argv[3][0]
         pwd_chars = sys.argv[3][1:]
         
     depth = int(sys.argv[4]) if len(sys.argv) > 4 else 0        
-        
-    xprv = base64.b64decode(sys.argv[2])
     started = time.time()
     
     if sys.argv[1][0] != '@':
@@ -142,6 +153,7 @@ if __name__ == '__main__':
                             
     if not done:
         print "Password not found"
+        print "Took %.1f seconds" % (time.time() - started,)
 
 
     
