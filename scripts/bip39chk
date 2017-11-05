@@ -48,7 +48,7 @@ if len(sys.argv) < 2:
     print( "\nUsage: %s [-s][-j][-p passphrase][-w wordlist][-a count][-s start][-c change] <seed words>" % sys.argv[0] )
     print( "-s\tSegWit wallet\n-j\tJSON format output\n-p\tBIP39 passphrase (extra words)\n-w\tWordlist filename (default english.txt)" )
     print( "-a\tNumber of addresses to generate, default none\n-i\tAddress start index, default 0\n-c\tOutput \"change\" addresses" )
-    print( "Seed words can be in quotes or not, but must follow all options.\nCurrently does not support multisig." )
+    print( "Seed words can be in quotes or not, but must follow all options." )
     sys.exit(1)
 
 passphrase = ''
