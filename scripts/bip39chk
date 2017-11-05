@@ -1,0 +1,155 @@
+#!/usr/bin/env python3
+#
+# Validate BIP39 seed words and output useful values and info.
+#
+# Adjusts last word when checksum is wrong. Allows creating a seed with dice/coins
+# offline and then using the xpub online for a watch-only wallet without exposing 
+# the xprv. Or just paste the valid seed into Electrum.
+#
+# This program requires that Electrum 3.0 or greater is installed on the system.
+#
+# Much of this code has been derived from the Electrum 3.0 keystore module.
+# I wanted to make it more independent but there's too much well tested code 
+# already written. Not only is it easier but it's a lot safer than starting 
+# from scratch.
+#
+# Electrum is distributed under the MIT license included below as required.
+#
+# Portions Copyright (C) 2016  The Electrum developers
+#
+# Permission is hereby granted, free of charge, to any person
+# obtaining a copy of this software and associated documentation files
+# (the "Software"), to deal in the Software without restriction,
+# including without limitation the rights to use, copy, modify, merge,
+# publish, distribute, sublicense, and/or sell copies of the Software,
+# and to permit persons to whom the Software is furnished to do so,
+# subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be
+# included in all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+# EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+# MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+# NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS
+# BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
+# ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+# CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
+import os, sys, hashlib, binascii, json
+from unicodedata import normalize
+from electrum.bitcoin import bip32_root, bip32_private_derivation, bip32_public_derivation, pubkey_to_address, deserialize_xpub, CKD_pub
+from electrum.mnemonic import load_wordlist
+
+if len(sys.argv) < 2:
+    print( "\nValidate seed words, fix checksum and output various BIP39 info." )
+    print( "Requires Electrum 3.0 or greater installed on system." )
+    print( "\nUsage: %s [-s][-j][-p passphrase][-w wordlist][-a count][-s start][-c change] <seed words>" % sys.argv[0] )
+    print( "-s\tSegWit wallet\n-j\tJSON format output\n-p\tBIP39 passphrase (extra words)\n-w\tWordlist filename (default english.txt)" )
+    print( "-a\tNumber of addresses to generate, default none\n-i\tAddress start index, default 0\n-c\tOutput \"change\" addresses" )
+    print( "Seed words can be in quotes or not, but must follow all options.\nCurrently does not support multisig." )
+    sys.exit(1)
+
+passphrase = ''
+derivation = "m/44'/0'/0'"
+wordlist = 'english.txt'
+addrcfg = { 'cnt':0, 'start':0, 'chg':0 }
+js = False
+
+seedargs = 1
+while(seedargs < len(sys.argv)):
+    if sys.argv[seedargs][0] != '-':
+        break
+    opt = sys.argv[seedargs][1]
+    if opt == 'p':
+        passphrase = sys.argv[seedargs+1]
+        seedargs += 1
+    elif opt == 's':
+        derivation = "m/49'/0'/0'"
+    elif opt == 'w':
+        wordlist = sys.argv[seedargs+1]
+        seedargs += 1
+    elif opt == 'j':
+        js = True
+    elif opt == 'a':
+        addrcfg['cnt'] = int(sys.argv[seedargs+1])
+        seedargs += 1
+    elif opt == 'i':
+        addrcfg['start'] = int(sys.argv[seedargs+1])
+        seedargs += 1
+    elif opt == 'c':
+        addrcfg['chg'] = 1
+    seedargs += 1
+seedlist = ' '.join(sys.argv[seedargs:]).split()
+
+def bip39_to_seed(mnemonic, passphrase):
+    import pbkdf2, hmac
+    PBKDF2_ROUNDS = 2048
+    mnemonic = normalize('NFKD', ' '.join(mnemonic.split()))
+    passphrase = normalize('NFKD', passphrase or '')
+    return pbkdf2.PBKDF2(mnemonic, 'mnemonic' + passphrase, iterations = PBKDF2_ROUNDS, macmodule = hmac, digestmodule = hashlib.sha512).read(64)
+
+def bip39_validate(mnemonic, wordlist):
+    words = [ normalize('NFKD', word) for word in mnemonic.split() ]
+    words_len = len(words)
+    wordlist = load_wordlist(wordlist)
+    n = len(wordlist)
+    checksum_length = 11*words_len//33
+    entropy_length = 32*checksum_length
+    i = 0
+    words.reverse()
+    while words:
+        w = words.pop()
+        try:
+            k = wordlist.index(w)
+        except ValueError:
+            print("Word list not valid")
+            sys.exit(1)
+        i = i*n + k
+    if words_len not in [12, 15, 18, 21, 24]:
+        return False, None
+    entropy = i >> checksum_length
+    checksum = i % 2**checksum_length
+    h = '{:x}'.format(entropy)
+    while len(h) < entropy_length/4:
+        h = '0'+h
+    b = bytearray.fromhex(h)
+    hashed = int(binascii.hexlify(hashlib.sha256(b).digest()), 16)
+    calculated_checksum = hashed >> (256 - checksum_length)
+    return wordlist[k-checksum+calculated_checksum] if checksum != calculated_checksum else w
+
+last_word = bip39_validate(' '.join(seedlist), wordlist)
+if seedlist[-1] != last_word:
+    seedlist[-1] = last_word
+
+out = { 'seed': ' '.join(seedlist) }
+out['derivation'] = derivation
+
+bip32_seed = bip39_to_seed(out['seed'], passphrase)
+out['seedhex'] = str(binascii.hexlify(bip32_seed), 'ascii') 
+xtype = 'p2wpkh-p2sh' if derivation.startswith("m/49'") else 'standard'
+out['type'] = 'p2pkh' if xtype == 'standard' else xtype
+
+prv,pub = bip32_root(bip32_seed, xtype)
+out['prv'],out['pub'] = bip32_private_derivation(prv, "m/", derivation)
+
+if addrcfg['cnt'] > 0:
+    out['addr'] = {}
+    xpubaddr = bip32_public_derivation(out['pub'], "", "/%d" % addrcfg['chg'])
+    for i in range(addrcfg['start'], addrcfg['start']+addrcfg['cnt']):
+        _, _, _, _, c, cK = deserialize_xpub(xpubaddr)
+        cK, c = CKD_pub(cK, c, i)
+        out['addr'][i] = pubkey_to_address(out['type'], binascii.hexlify(cK).decode('ascii'))
+    
+if js:
+    print(json.dumps(out, indent=2, sort_keys=True))
+else:
+    print()
+    for k in ['seed','seedhex','type','prv','pub']:
+        print(k+': '+out[k])
+    if 'addr' in out:
+        print()
+        for k,v in out['addr'].items():
+            print("addr[%s]: %s" % (k,v))
+    print()

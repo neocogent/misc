@@ -7,6 +7,7 @@ scripts:
     supernova - generate a Bitcoin black hole address matching prefix
     watchaddr - insert addresses from stdin into Electrum (2.0) watch-only wallet
     mchat - test multicast local network peer messaging
+    bip39chk - validate, fix chksum and output info on BIP39 seeds
     
     need pycrypto ( pip install pycrypto ):
         pwscan - simple Electrum password cracker, template char sub.
