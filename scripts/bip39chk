@@ -45,43 +45,62 @@ from electrum.mnemonic import load_wordlist
 if len(sys.argv) < 2:
     print( "\nValidate seed words, fix checksum and output various BIP39 info." )
     print( "Requires Electrum 3.0 or greater installed on system." )
-    print( "\nUsage: %s [-s][-j][-p passphrase][-w wordlist][-a count][-s start][-c change] <seed words>" % sys.argv[0] )
+    print( "\nUsage: %s [-s][-j][-p passphrase][-w wordlist][-a count][-s start][-c change][-e count] <seed words>" % sys.argv[0] )
     print( "-s\tSegWit wallet\n-j\tJSON format output\n-p\tBIP39 passphrase (extra words)\n-w\tWordlist filename (default english.txt)" )
     print( "-a\tNumber of addresses to generate, default none\n-i\tAddress start index, default 0\n-c\tOutput \"change\" addresses" )
-    print( "Seed words can be in quotes or not, but must follow all options." )
+    print( "-e\tUse input data as entropy to create word list of given word count.\n-x\tInput is xpub/ypub, only output addresses" )
+    print( "Seed words can be in quotes or not, but must follow all options. Use -- to read input line from stdin." )
     sys.exit(1)
 
 passphrase = ''
 derivation = "m/44'/0'/0'"
 wordlist = 'english.txt'
 addrcfg = { 'cnt':0, 'start':0, 'chg':0 }
-js = False
+wordcount = 0
+js,addronly = False,False
 
 seedargs = 1
+seed_data = None
 while(seedargs < len(sys.argv)):
     if sys.argv[seedargs][0] != '-':
         break
-    opt = sys.argv[seedargs][1]
-    if opt == 'p':
-        passphrase = sys.argv[seedargs+1]
-        seedargs += 1
-    elif opt == 's':
-        derivation = "m/49'/0'/0'"
-    elif opt == 'w':
-        wordlist = sys.argv[seedargs+1]
-        seedargs += 1
-    elif opt == 'j':
-        js = True
-    elif opt == 'a':
-        addrcfg['cnt'] = int(sys.argv[seedargs+1])
-        seedargs += 1
-    elif opt == 'i':
-        addrcfg['start'] = int(sys.argv[seedargs+1])
-        seedargs += 1
-    elif opt == 'c':
-        addrcfg['chg'] = 1
+    n = 1
+    while n < len(sys.argv[seedargs]):
+        opt = sys.argv[seedargs][n]
+        if opt == 's':
+            derivation = "m/49'/0'/0'" 
+        elif opt == 'j':
+            js = True    
+        elif opt == 'c':
+            addrcfg['chg'] = 1
+        elif opt == 'x':
+            addronly = True
+        else:
+            if opt == 'p':
+                passphrase = sys.argv[seedargs+1]
+            elif opt == 'w':
+                wordlist = sys.argv[seedargs+1]
+            elif opt == 'a':
+                addrcfg['cnt'] = int(sys.argv[seedargs+1])
+            elif opt == 'i':
+                addrcfg['start'] = int(sys.argv[seedargs+1])
+            elif opt == 'e':
+                wordcount = int(sys.argv[seedargs+1])
+            elif opt == '-':
+                seed_data = sys.stdin.readline().replace('\n', '').split()
+            else:
+                print("Unrecognized option:", opt)
+                break
+            seedargs += 1
+            break
+        n += 1
     seedargs += 1
-seedlist = ' '.join(sys.argv[seedargs:]).split()
+
+if seed_data == None:
+    if seedargs == len(sys.argv):
+        print("No input data. Missing words or -- for stdin.")
+        sys.exit(2)
+    seed_data = ' '.join(sys.argv[seedargs:]).split()
 
 def bip39_to_seed(mnemonic, passphrase):
     import pbkdf2, hmac
@@ -89,6 +108,16 @@ def bip39_to_seed(mnemonic, passphrase):
     mnemonic = normalize('NFKD', ' '.join(mnemonic.split()))
     passphrase = normalize('NFKD', passphrase or '')
     return pbkdf2.PBKDF2(mnemonic, 'mnemonic' + passphrase, iterations = PBKDF2_ROUNDS, macmodule = hmac, digestmodule = hashlib.sha512).read(64)
+    
+def hex_to_bip39(hexdata, wordlist, wordcount):
+    wordlist = load_wordlist(wordlist)
+    n = len(wordlist)
+    i = int(hexdata, 16)
+    words = []
+    while i > 0:
+        i,k = divmod(i, n)
+        words.append(wordlist[k])
+    return words[:wordcount]
 
 def bip39_validate(mnemonic, wordlist):
     words = [ normalize('NFKD', word) for word in mnemonic.split() ]
@@ -119,23 +148,36 @@ def bip39_validate(mnemonic, wordlist):
     calculated_checksum = hashed >> (256 - checksum_length)
     return wordlist[k-checksum+calculated_checksum] if checksum != calculated_checksum else w
 
-last_word = bip39_validate(' '.join(seedlist), wordlist)
-if seedlist[-1] != last_word:
-    seedlist[-1] = last_word
+if addronly:
+    out = { 'pub': seed_data[0] }
+    if not out['pub'][0] in 'xy':
+        print("Invalid pub key input. Should be xpub or ypub.")
+        sys.exit(3)
+    out['type'] = 'p2pkh' if out['pub'][0] == 'x' else 'p2wpkh-p2sh'
+    addrcfg['cnt'] = addrcfg['cnt'] or 5
+    
+else:
+    if wordcount in [12,15,18,21,24]:
+        seed_data = hex_to_bip39(binascii.hexlify(hashlib.sha512(seed_data[0].encode()).digest()), wordlist, wordcount)
 
-out = { 'seed': ' '.join(seedlist) }
-out['derivation'] = derivation
+    last_word = bip39_validate(' '.join(seed_data), wordlist)
+    if seed_data[-1] != last_word:
+        seed_data[-1] = last_word
 
-bip32_seed = bip39_to_seed(out['seed'], passphrase)
-out['seedhex'] = str(binascii.hexlify(bip32_seed), 'ascii') 
-xtype = 'p2wpkh-p2sh' if derivation.startswith("m/49'") else 'standard'
-out['type'] = 'p2pkh' if xtype == 'standard' else xtype
+    out = { 'seed': ' '.join(seed_data) }
+    out['derivation'] = derivation
 
-prv,pub = bip32_root(bip32_seed, xtype)
-out['prv'],out['pub'] = bip32_private_derivation(prv, "m/", derivation)
+    bip32_seed = bip39_to_seed(out['seed'], passphrase)
+    out['seedhex'] = str(binascii.hexlify(bip32_seed), 'ascii') 
+    xtype = 'p2wpkh-p2sh' if derivation.startswith("m/49'") else 'standard'
+    out['type'] = 'p2pkh' if xtype == 'standard' else xtype
+
+    prv,pub = bip32_root(bip32_seed, xtype)
+    out['prv'],out['pub'] = bip32_private_derivation(prv, "m/", derivation)
 
 if addrcfg['cnt'] > 0:
     out['addr'] = {}
+    out['addrtype'] = 'change' if addrcfg['chg'] == 1 else 'receiving'
     xpubaddr = bip32_public_derivation(out['pub'], "", "/%d" % addrcfg['chg'])
     for i in range(addrcfg['start'], addrcfg['start']+addrcfg['cnt']):
         _, _, _, _, c, cK = deserialize_xpub(xpubaddr)
