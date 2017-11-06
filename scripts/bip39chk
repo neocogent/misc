@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 #
-# Validate BIP39 seed words and output useful values and info.
+# Validate / fix BIP39 seed words and dump derived info.
 #
 # Adjusts last word when checksum is wrong. Allows creating a seed with dice/coins
 # offline and then using the xpub online for a watch-only wallet without exposing 
@@ -43,13 +43,13 @@ from electrum.bitcoin import bip32_root, bip32_private_derivation, bip32_public_
 from electrum.mnemonic import load_wordlist
 
 if len(sys.argv) < 2:
-    print( "\nValidate seed words, fix checksum and output various BIP39 info." )
+    print( "\nValidate / fix BIP39 seed words and dump related info." )
     print( "Requires Electrum 3.0 or greater installed on system." )
     print( "\nUsage: %s [-s][-j][-p passphrase][-w wordlist][-a count][-s start][-c change][-e count] <seed words>" % sys.argv[0] )
     print( "-s\tSegWit wallet\n-j\tJSON format output\n-p\tBIP39 passphrase (extra words)\n-w\tWordlist filename (default english.txt)" )
     print( "-a\tNumber of addresses to generate, default none\n-i\tAddress start index, default 0\n-c\tOutput \"change\" addresses" )
     print( "-e\tUse input data as entropy to create word list of given word count.\n-x\tInput is xpub/ypub, only output addresses" )
-    print( "Seed words can be in quotes or not, but must follow all options. Use -- to read input line from stdin." )
+    print( "Seed words can be in quotes or not, but must follow options. Use -- to read from stdin." )
     sys.exit(1)
 
 passphrase = ''
