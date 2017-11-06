@@ -57,7 +57,7 @@ derivation = "m/44'/0'/0'"
 wordlist = 'english.txt'
 addrcfg = { 'cnt':0, 'start':0, 'chg':0 }
 wordcount = 0
-js,addronly = False,False
+js,addr_only = False,False
 
 seedargs = 1
 seed_data = None
@@ -74,7 +74,7 @@ while(seedargs < len(sys.argv)):
         elif opt == 'c':
             addrcfg['chg'] = 1
         elif opt == 'x':
-            addronly = True
+            addr_only = True
         else:
             if opt == 'p':
                 passphrase = sys.argv[seedargs+1]
@@ -148,7 +148,7 @@ def bip39_validate(mnemonic, wordlist):
     calculated_checksum = hashed >> (256 - checksum_length)
     return wordlist[k-checksum+calculated_checksum] if checksum != calculated_checksum else w
 
-if addronly:
+if addr_only:
     out = { 'pub': seed_data[0] }
     if not out['pub'][0] in 'xy':
         print("Invalid pub key input. Should be xpub or ypub.")
@@ -187,9 +187,10 @@ if addrcfg['cnt'] > 0:
 if js:
     print(json.dumps(out, indent=2, sort_keys=True))
 else:
-    print()
-    for k in ['seed','seedhex','type','prv','pub']:
-        print(k+': '+out[k])
+    if not addr_only:
+        print()
+        for k in ['seed','seedhex','type','prv','pub','addtype']:
+            print(k+': '+out[k])
     if 'addr' in out:
         print()
         for k,v in out['addr'].items():
