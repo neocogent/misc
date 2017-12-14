@@ -14,6 +14,7 @@
 # %w = WIF privkey
 # %e = BIP38 encrypted privkey
 # %p = hex public key
+# %k = pubkey hash
 # %a = address
 #
 # eg. "Address: %a\nPrivkey: %w" outputs a format like the vanitygen program
@@ -57,9 +58,14 @@ def b58hex(s58):
     
 def priv2pub(priv, compress=False):
     verkey = ecdsa.SigningKey.from_secret_exponent(long(priv, 16), curve=SECP256k1 ).get_verifying_key()
-    prefix = '04' if not compress else ( '03' if verkey.pubkey.point.y() % 2 == 1 else '02' )
+    prefix = '\04' if not compress else ( '\03' if verkey.pubkey.point.y() % 2 == 1 else '\02' )
     return prefix + ( '%032x' % verkey.pubkey.point.x() if compress else verkey.to_string() )
-    
+
+def mkpkh(pubkey):
+    rmd = hashlib.new('ripemd160')
+    rmd.update(hashlib.sha256(pubkey).digest())
+    return rmd.digest()
+        
 def mkaddr(pubkey):
     pad = ""
     rmd = hashlib.new('ripemd160')
@@ -128,10 +134,11 @@ for line in sys.stdin:
     chksum = binascii.hexlify(hashlib.sha256(hashlib.sha256(binascii.unhexlify('80'+line)).digest()).digest()[:4])
     privkey = long('80'+line+chksum+('01' if compress else ''), 16)
     pubkey = priv2pub(line, compress)
+    pkh = mkpkh(pubkey)
     addr = mkaddr(pubkey)
     
     out = sys.argv[arg1].replace('%h', line).replace('%w', b58encode(privkey))
-    out = out.replace('%p', binascii.hexlify(pubkey).upper()).replace('%a', addr)
+    out = out.replace('%p', binascii.hexlify(pubkey).upper()).replace('%a', addr).replace('%k', pkh.encode('hex'))
     if len(sys.argv) > arg1+1:
         bip38key = bip38_encrypt(line, addr, sys.argv[arg1+1], compress)
         out = out.replace('%e', bip38key)   
