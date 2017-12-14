@@ -40,6 +40,7 @@
 import os, sys, hashlib, binascii, json
 from unicodedata import normalize
 from electrum.bitcoin import bip32_root, bip32_private_derivation, bip32_public_derivation, pubkey_to_address, deserialize_xpub, CKD_pub
+from electrum.bitcoin import hash_160, p2wpkh_nested_script, bfh, bh2u, hash160_to_p2sh
 from electrum.mnemonic import load_wordlist
 
 if len(sys.argv) < 2:
@@ -48,6 +49,7 @@ if len(sys.argv) < 2:
     print( "\nUsage: %s [-s][-j][-p passphrase][-w wordlist][-a count][-s start][-c change][-e count] <seed words>" % sys.argv[0] )
     print( "-s\tSegWit wallet\n-j\tJSON format output\n-p\tBIP39 passphrase (extra words)\n-w\tWordlist filename (default english.txt)" )
     print( "-a\tNumber of addresses to generate, default none\n-i\tAddress start index, default 0\n-c\tOutput \"change\" addresses" )
+    print( "-k\tInclude pubkey or script hash" )
     print( "-e\tUse input data as entropy to create word list of given word count.\n-x\tInput is xpub/ypub, only output addresses" )
     print( "Seed words can be in quotes or not, but must follow options. Use -- to read from stdin." )
     sys.exit(1)
@@ -57,7 +59,7 @@ derivation = "m/44'/0'/0'"
 wordlist = 'english.txt'
 addrcfg = { 'cnt':0, 'start':0, 'chg':0 }
 wordcount = 0
-js,addr_only = False,False
+js,addr_only,pkh = False,False,False
 
 seedargs = 1
 seed_data = None
@@ -70,7 +72,9 @@ while(seedargs < len(sys.argv)):
         if opt == 's':
             derivation = "m/49'/0'/0'" 
         elif opt == 'j':
-            js = True    
+            js = True 
+        elif opt == 'k':
+            pkh = True 
         elif opt == 'c':
             addrcfg['chg'] = 1
         elif opt == 'x':
@@ -96,6 +100,7 @@ while(seedargs < len(sys.argv)):
         n += 1
     seedargs += 1
 
+    
 if seed_data == None:
     if seedargs == len(sys.argv):
         print("No input data. Missing words or -- for stdin.")
@@ -177,22 +182,31 @@ else:
 
 if addrcfg['cnt'] > 0:
     out['addr'] = {}
+    out['hash'] = {}
     out['addrtype'] = 'change' if addrcfg['chg'] == 1 else 'receiving'
     xpubaddr = bip32_public_derivation(out['pub'], "", "/%d" % addrcfg['chg'])
     for i in range(addrcfg['start'], addrcfg['start']+addrcfg['cnt']):
         _, _, _, _, c, cK = deserialize_xpub(xpubaddr)
         cK, c = CKD_pub(cK, c, i)
         out['addr'][i] = pubkey_to_address(out['type'], binascii.hexlify(cK).decode('ascii'))
+        if pkh:
+            if xtype == 'standard':
+                out['hash'][i] = binascii.hexlify(hash_160(bfh(binascii.hexlify(cK).decode('ascii')))).decode('ascii')
+            else:
+                out['hash'][i] = binascii.hexlify(hash_160(bfh(p2wpkh_nested_script(binascii.hexlify(cK).decode('ascii'))))).decode('ascii')
     
 if js:
     print(json.dumps(out, indent=2, sort_keys=True))
 else:
     if not addr_only:
         print()
-        for k in ['seed','seedhex','type','prv','pub','addtype']:
+        for k in ['seed','seedhex','type','prv','pub']:
             print(k+': '+out[k])
     if 'addr' in out:
         print()
+        print( "addrtype", out['addrtype'] )
         for k,v in out['addr'].items():
             print("addr[%s]: %s" % (k,v))
+        for k,v in out['hash'].items():
+            print("hash[%s]: %s, pkh: %s" % (k,v))
     print()
