@@ -59,7 +59,7 @@ def b58hex(s58):
 def priv2pub(priv, compress=False):
     verkey = ecdsa.SigningKey.from_secret_exponent(long(priv, 16), curve=SECP256k1 ).get_verifying_key()
     prefix = '\04' if not compress else ( '\03' if verkey.pubkey.point.y() % 2 == 1 else '\02' )
-    return prefix + ( '%032x' % verkey.pubkey.point.x() if compress else verkey.to_string() )
+    return prefix + ( binascii.unhexlify('%064x' % verkey.pubkey.point.x()) if compress else verkey.to_string() )
 
 def mkpkh(pubkey):
     rmd = hashlib.new('ripemd160')
@@ -103,8 +103,8 @@ def bip38_decrypt(encrypted_privkey, passphrase):
     pub = priv2pub(priv, data[2] != '\xc0')
     if hashlib.sha256(hashlib.sha256(mkaddr(pub)).digest()).digest()[0:4] != data[3:7]:
         sys.exit('BIP38 verification failed! Password is likely incorrect.')
-    chksum = binascii.hexlify(hashlib.sha256(hashlib.sha256(binascii.unhexlify('80'+priv)).digest()).digest()[:4])
-    return b58encode(long('80'+priv+chksum+compress, 16))
+    chksum = binascii.hexlify(hashlib.sha256(hashlib.sha256(binascii.unhexlify('80'+priv+compress)).digest()).digest()[:4])
+    return b58encode(long('80'+priv+compress+chksum, 16))
     
 import ecdsa
 
@@ -131,8 +131,8 @@ for line in sys.stdin:
     compress = True if len(line) > 72 else compress
     line = line[:64]
 
-    chksum = binascii.hexlify(hashlib.sha256(hashlib.sha256(binascii.unhexlify('80'+line)).digest()).digest()[:4])
-    privkey = long('80'+line+chksum+('01' if compress else ''), 16)
+    chksum = binascii.hexlify(hashlib.sha256(hashlib.sha256(binascii.unhexlify('80'+line+('01' if compress else ''))).digest()).digest()[:4])
+    privkey = long('80'+line+('01' if compress else '')+chksum, 16)
     pubkey = priv2pub(line, compress)
     pkh = mkpkh(pubkey)
     addr = mkaddr(pubkey)
