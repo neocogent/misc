@@ -204,9 +204,10 @@ else:
             print(k+': '+out[k])
     if 'addr' in out:
         print()
+        h = 'pkh' if xtype == 'standard' else 'sh' 
         print( "addrtype", out['addrtype'] )
         for k,v in out['addr'].items():
             print("addr[%s]: %s" % (k,v))
         for k,v in out['hash'].items():
-            print("hash[%s]: %s, pkh: %s" % (k,v))
+            print("%s[%s]: %s" % (h,k,v))
     print()
