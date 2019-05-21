@@ -86,6 +86,10 @@ if len(sys.argv) < 3:
     print "Usage: %s <token file> <BIP38 encoded key>\n" % sys.argv[0]
     sys.exit(0)
 
+hexkey = "0"+b58hex(sys.argv[2])
+if hexkey[0:2] != '0142':
+    sys.exit('BIP38 Third-party key (EC Multiply flag) not supported.')
+        
 with open(sys.argv[1]) as f:
     tokens = f.read()
 tokens = tokens.split()
