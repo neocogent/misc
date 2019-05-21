@@ -53,7 +53,7 @@ def b58encode(num, pad=''):
 def b58hex(s58):
     num = 0L
     for (i, c) in enumerate(s58[::-1]):
-        num += alphabet.find(c) * (58**i)       
+        num += alphabet.find(c) * (58**i)      
     return hex(num)[2:-1].upper()
     
 def priv2pub(priv, compress=False):
@@ -94,7 +94,10 @@ def bip38_decrypt(encrypted_privkey, passphrase):
     from Crypto.Cipher import AES
     import scrypt
     
-    data = binascii.unhexlify("0"+b58hex(encrypted_privkey))
+    hexkey = "0"+b58hex(encrypted_privkey)
+    if hexkey[0:2] != '0142':
+        sys.exit('BIP38 Third-party key (EC Multiply flag) not supported.')
+    data = binascii.unhexlify(hexkey)
     compress = '' if data[2] == '\xc0' else '01'
     key = scrypt.hash(passphrase, data[3:7], 16384, 8, 8)
     aes = AES.new(key[32:64])
