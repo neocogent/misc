@@ -39,8 +39,7 @@
 
 import os, sys, hashlib, binascii, json
 from unicodedata import normalize
-from electrum.bitcoin import bip32_root, bip32_private_derivation, bip32_public_derivation, pubkey_to_address, deserialize_xpub, CKD_pub
-from electrum.bitcoin import hash_160, p2wpkh_nested_script, bfh, bh2u, hash160_to_p2sh
+
 from electrum.mnemonic import load_wordlist
 
 if len(sys.argv) < 2:
@@ -177,10 +176,13 @@ else:
     xtype = 'p2wpkh-p2sh' if derivation.startswith("m/49'") else 'standard'
     out['type'] = 'p2pkh' if xtype == 'standard' else xtype
 
-    prv,pub = bip32_root(bip32_seed, xtype)
-    out['prv'],out['pub'] = bip32_private_derivation(prv, "m/", derivation)
+    #from electrum.bitcoin import bip32_root, bip32_private_derivation
+    #prv,pub = bip32_root(bip32_seed, xtype)
+    #out['prv'],out['pub'] = bip32_private_derivation(prv, "m/", derivation)
 
 if addrcfg['cnt'] > 0:
+    from electrum.bitcoin import bip32_public_derivation, pubkey_to_address, deserialize_xpub, CKD_pub
+    from electrum.bitcoin import hash_160, p2wpkh_nested_script, bfh
     out['addr'] = {}
     out['hash'] = {}
     out['addrtype'] = 'change' if addrcfg['chg'] == 1 else 'receiving'
@@ -200,7 +202,7 @@ if js:
 else:
     if not addr_only:
         print()
-        for k in ['seed','seedhex','type','prv','pub']:
+        for k in ['seed','seedhex','type']:#,'prv','pub']:
             print(k+': '+out[k])
     if 'addr' in out:
         print()
