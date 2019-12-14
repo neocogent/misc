@@ -50,6 +50,7 @@ if len(sys.argv) < 2:
     print( "-a\tNumber of addresses to generate, default none\n-i\tAddress start index, default 0\n-c\tOutput \"change\" addresses" )
     print( "-k\tInclude pubkey or script hash" )
     print( "-e\tUse input data as entropy to create word list of given word count.\n-x\tInput is xpub/ypub, only output addresses" )
+    print( "-d\tUse input data directly to create word list of given word count." )
     print( "Seed words can be in quotes or not, but must follow options. Use -- to read from stdin." )
     sys.exit(1)
 
@@ -57,8 +58,8 @@ passphrase = ''
 derivation = "m/44'/0'/0'"
 wordlist = 'english.txt'
 addrcfg = { 'cnt':0, 'start':0, 'chg':0 }
-wordcount = 0
-js,addr_only,pkh = False,False,False
+wordcount,orgdata = 0,0
+js,addr_only,pkh,direct = False,False,False,False
 
 seedargs = 1
 seed_data = None
@@ -74,6 +75,8 @@ while(seedargs < len(sys.argv)):
             js = True 
         elif opt == 'k':
             pkh = True 
+        elif opt == 'd':
+            direct = True 
         elif opt == 'c':
             addrcfg['chg'] = 1
         elif opt == 'x':
@@ -162,7 +165,8 @@ if addr_only:
     
 else:
     if wordcount in [12,15,18,21,24]:
-        seed_data = hex_to_bip39(binascii.hexlify(hashlib.sha512(seed_data[0].encode()).digest()), wordlist, wordcount)
+        orgdata = seed_data[0]
+        seed_data = hex_to_bip39(binascii.hexlify(hashlib.sha512(seed_data[0].encode()).digest()) if not direct else seed_data[0]+"00", wordlist, wordcount)
 
     last_word = bip39_validate(' '.join(seed_data), wordlist)
     if seed_data[-1] != last_word:
@@ -175,6 +179,8 @@ else:
     out['seedhex'] = str(binascii.hexlify(bip32_seed), 'ascii') 
     xtype = 'p2wpkh-p2sh' if derivation.startswith("m/49'") else 'standard'
     out['type'] = 'p2pkh' if xtype == 'standard' else xtype
+    if orgdata != 0:
+        out['entropy'] = orgdata
 
     #from electrum.bitcoin import bip32_root, bip32_private_derivation
     #prv,pub = bip32_root(bip32_seed, xtype)
