@@ -1,0 +1,126 @@
+#!/usr/bin/env python3
+
+# Import dependencies
+import socket, time, random, hashlib, binascii
+from struct import pack, unpack, unpack_from
+from bitcoinrpc.authproxy import AuthServiceProxy, JSONRPCException
+
+# node access info
+rpc_user = 'userid'
+rpc_pwd = 'pwd'
+peer_ip_address = '192.168.0.12'
+peer_rpc_port = 8332
+peer_tcp_port = my_tcp_port = 8333
+my_ip_address = '127.0.0.1'
+
+sub_version = "/FeeCalc:0.1.0/"
+magic_value = 0xd9b4bef9 # mainnet
+avg_txs_blk = 2000
+buffer_size = 4096
+txcnt = txprn = 0
+
+feebins = [1,2,3,4,5,6,7,8,10,12,14,17,20,25,30,40,50,60,70,80,100,120,140,170,200,250,300,400,500,600,700,800,1000,1200,1400,1700,2000,3000,4000,5000,100000000]
+feetxs = [0] * len(feebins)
+#blkbins = [1,2,6,12,24,48,96,24*6,48*6,72*6]
+#feeblks = [0] * len(blkbins)
+
+def mk_msg(command, payload):
+    checksum = hashlib.sha256(hashlib.sha256(payload).digest()).digest()[0:4]
+    return(pack('I12sI4s', magic_value, command.encode(), len(payload), checksum) + payload)
+
+def create_network_address(ip_address, port):
+    network_address = pack('>8s16sH', b'\x01', 
+        bytearray.fromhex("00000000000000000000ffff") + socket.inet_aton(ip_address), port)
+    return(network_address)
+    
+def create_payload_version():
+    version = 70015
+    services = 0
+    timestamp = int(time.time())
+    addr_local = create_network_address(my_ip_address, my_tcp_port)
+    addr_peer = create_network_address(peer_ip_address, peer_tcp_port)
+    nonce = random.getrandbits(64)
+    start_height = 0
+    relay = False
+    subver = sub_version.encode()
+    subver = bytes(len(subver))+subver
+    payload = pack('<LQQ26s26sQ%dsL?' % len(subver), version, services, timestamp, addr_peer,
+                          addr_local, nonce, subver, start_height, relay)
+    return(payload)
+
+def decodeVarInt(v):
+    if v[0] <= 0xfc:
+        return unpack('<B', v[0:1])[0],1
+    if v[0] == 0xfd:
+        return unpack('<H', v[1:3])[0],3
+    if v[0] == 0xfe:
+        return unpack('<I', v[1:5])[0],5
+    return unpack('<Q', v[1:9])[0],9
+
+def addFees(inv):
+    global feetxs,txcnt,txprn
+    count,sz = decodeVarInt(inv[:9])
+    for n in range(count):
+        t,txid = unpack('I32s', inv[sz+n*36:sz+36+n*36])
+        if t == 1:
+            try:
+                tx = rpc.getmempoolentry(txid[::-1].hex())
+            except JSONRPCException:
+                print("BADTX", txid.hex())
+                pass
+            fee = int(tx['fees']['base']/tx['vsize']*100000000)
+            for n in range(len(feebins)):
+                if feebins[n] > fee:
+                    feetxs[max(n-1,0)] += 1
+                    break
+            txcnt += 1
+        else:
+            print("BADINV")
+    if txcnt > txprn+10:
+        feesum = 0
+        fees = [0] * len(feetxs)
+        for n in range(len(feetxs)-1,-1,-1):
+            feesum += feetxs[n]
+            fees[n] = feesum
+        for n in range(len(fees)):
+            if fees[n] > 0:
+                print('(%d,%d)' % (feebins[n],fees[n]),end ="")
+        print("\n")
+        txprn = txcnt
+
+if __name__ == '__main__':
+
+    # init connection to node
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s.connect((peer_ip_address, peer_tcp_port))
+    rpc = AuthServiceProxy("http://%s:%s@%s:%d" % (rpc_user,rpc_pwd,peer_ip_address,peer_rpc_port))
+
+    s.send(mk_msg('version', create_payload_version()))
+    data = s.recv(buffer_size)
+
+    s.send(mk_msg('verack', b''))
+    data = s.recv(buffer_size)
+    
+    # request the mempool
+    s.send(mk_msg('mempool', b''))
+   
+    # clear filter allowing txs
+    s.send(mk_msg('filterclear', b''))
+    
+    data = b''
+    while True:
+        data += s.recv(buffer_size)
+        if len(data) >= 24:
+            size, = unpack_from('I', data, 16)
+            while(len(data) < size+24):
+                data += s.recv(buffer_size)
+            payload = data[24:size+24]
+            if data[4:7] == b'inv':
+                addFees(payload)
+            elif data[4:8] == b'ping':
+                s.send(mk_msg('pong', payload))
+            else:
+                print("MSG", data[4:16].decode('ascii'))
+            data = data[size+24:]
+
+    s.close()
