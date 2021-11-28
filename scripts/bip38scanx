@@ -109,8 +109,8 @@ if __name__ == '__main__':
         sys.exit(0)
         
     hexkey = "0"+b58hex(sys.argv[2])
-    if hexkey[0:2] != '0142':
-        sys.exit('BIP38 Third-party key (EC Multiply flag) not supported.')
+    if hexkey[0:4] != '0142':
+        sys.exit('BIP38 Third-party key (EC Multiply flag: %s) not supported.' % hexkey[0:4])
     
     with open(sys.argv[1]) as f:
         tokens = f.read()
