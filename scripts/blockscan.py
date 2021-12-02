@@ -26,7 +26,7 @@ while nBlk < blkmax:
 			for vout in tx['vout']:
 				reward += vout['value']
 				utxo = rpc.gettxout(tx['txid'], vout['n'])
-				if utxo is not None:
+				if utxo is None:
 					unspent += vout['value']
 		if 'fee' in tx:
 			fee += tx['fee']
@@ -36,7 +36,7 @@ while nBlk < blkmax:
 	if not reward == Decimal((int(5e9) >> (nBlk // 210000))/1e8):
 		print('Block:',nBlk,'Reward:',reward, flush=True)
 	elif nBlk % 50000 == 0:
-		print('Block:', nBlk, datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"), rewards, unpsent,fees, flush=True)
+		print('Block:', nBlk, datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"), rewards, unspent, fees, flush=True)
 	nBlk += 1
 	
 print('\nDone', datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
