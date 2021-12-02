@@ -1,5 +1,5 @@
 # Note - checkpoint lines have timestamp and three progress values
-# reward unspent fees - totals as at that block
+# reward spent fees - totals as at that block
 #
 Block: 0 2021-12-02 16:02:41 50.00000000 50.00000000 0
 Block: 50000 2021-12-02 16:04:28 2500050.00000000 1213601.34000000 3.83000000
