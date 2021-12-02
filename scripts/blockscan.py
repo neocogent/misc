@@ -36,7 +36,7 @@ while nBlk < blkmax:
 	if not reward == Decimal((int(5e9) >> (nBlk // 210000))/1e8):
 		print('Block:',nBlk,'Reward:',reward, flush=True)
 	elif nBlk % 50000 == 0:
-		print('Block:', nBlk, datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"), flush=True)
+		print('Block:', nBlk, datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"), rewards, unpsent,fees, flush=True)
 	nBlk += 1
 	
 print('\nDone', datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
