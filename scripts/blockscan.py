@@ -8,7 +8,7 @@ from decimal import Decimal
 
 cfg = { 'rpc':'http://user:pwd@127.0.0.1:8332' }
 
-rpc = AuthServiceProxy(cfg['rpc'])
+rpc = AuthServiceProxy(cfg['rpc'], timeout=240)
 
 nBlk = 0
 blkmax = rpc.getblockcount()
