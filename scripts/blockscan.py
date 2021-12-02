@@ -26,7 +26,7 @@ while nBlk < blkmax:
 			for vout in tx['vout']:
 				reward += vout['value']
 				utxo = rpc.gettxout(tx['txid'], vout['n'])
-				if utxo is None:
+				if not utxo is None:
 					unspent += vout['value']
 		if 'fee' in tx:
 			fee += tx['fee']
