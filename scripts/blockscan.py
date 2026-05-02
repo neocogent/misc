@@ -6,7 +6,7 @@ import os, sys, json, datetime
 from bitcoinrpc.authproxy import AuthServiceProxy, JSONRPCException
 from decimal import Decimal
 
-cfg = { 'rpc':'http://user:pwd@127.0.0.1:8332' }
+cfg = { 'rpc':'http://btchris:WU2LbudDGvXAbDnDHr2Q@127.0.0.1:8332' }
 
 rpc = AuthServiceProxy(cfg['rpc'], timeout=240)
 

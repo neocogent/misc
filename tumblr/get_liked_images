@@ -1,0 +1,67 @@
+#!/usr/bin/env python3
+
+import os, sys, json, re, requests, glob, datetime
+
+# set tumblr api values below
+blog = "blogname"
+apikey = "put your api key here"
+
+apiurl = "https://api.tumblr.com/v2/blog/{0}/likes?limit=50&after={1}&api_key={2}"
+subdir = "likes/"
+srcexps = [r"https[^ ]*s2048[^ ]*", r"https[^ ]*s1280[^ ]*", r"https[^ ]*s640[^ ]*", r"https[^ ]*s540[^ ]*", r"https[^ ]*s500[^ ]*", r"https[^ ]*_540[^ \"]*"]
+ts = 0
+
+if __name__ == '__main__':
+    
+    # check for lastlikes file
+    if os.path.exists("lastlikes"):
+        with open("lastlikes", 'r') as file:
+            ts = int(file.read().strip())
+            
+    # get likes since lastlikes timestamp
+    resp = requests.get(apiurl.format(blog, ts, apikey), headers={'User-Agent':'Wget/1.21.4'})
+    if resp.status_code != 200:
+        print("Error getting likes:", resp.status_code, "\n"+json.dumps(resp.json(), indent=4))
+        sys.exit(resp.status_code)
+    data = resp.json()
+    with open("lastlikes.json", 'w') as file:
+        file.write(json.dumps(data, indent=4))
+    
+    # get image for each like
+    for item in data["response"]["liked_posts"]:
+        blog = item["blog_name"]
+        ts = datetime.datetime.fromtimestamp(item["liked_timestamp"])
+        urls = []
+        if "body" in item:
+            for r in srcexps:
+                urls = re.findall(r, item["body"])
+                if len(urls) > 0:
+                    break
+        if "photos" in item:
+            for img in item["photos"]:
+                urls.append(img["original_size"]["url"])
+        if len(urls) > 0:
+            for url in urls:
+                filename = url.split("/")[-1]
+                if 'tumblr_' not in filename:
+                    filename = 'tumblr_'+filename
+                if not os.path.exists(subdir+blog+'/'+filename):
+                    resp = requests.get(url, headers={'User-Agent':'Wget/1.21.4'})
+                    if resp.status_code == 200:
+                        print(ts.strftime("%Y-%m-%d %H:%M:%S"), subdir+blog+'/'+filename)
+                        try:
+                            os.mkdir(subdir+blog)
+                        except FileExistsError:
+                            pass
+                        with open(subdir+blog+'/'+filename, 'wb') as file:
+                            file.write(resp.content)
+        else:
+            print("No urls:", item["blog_name"], item["id_string"])
+                    
+    # store the lastlikes ts for next time run
+    if len(data["response"]["liked_posts"]) > 0:
+        with open("lastlikes", 'w') as file:
+            file.write(str(data["response"]["liked_posts"][0]["liked_timestamp"]))
+    else:
+        print("No new likes.")
+    

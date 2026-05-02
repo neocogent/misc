@@ -1,0 +1,8 @@
+#!/bin/bash
+# replace youruserid with your actual id
+
+cd /home/youruserid/Pictures/tumblr
+setpriv --reuid youruserid ./get_liked_images >likescron.log
+setpriv --reuid youruserid env DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/1000/bus" notify-send "Tumblr Likes downloaded"
+logger "Tumblr likes downloaded"
+
